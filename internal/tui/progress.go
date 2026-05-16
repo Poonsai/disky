@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -85,11 +86,11 @@ func (m ProgressModel) View() string {
 		"%s\n\n %s %s items  •  %s  •  %s\n   Currently: %s\n\n%s\n",
 		StyleTitle.Render(fmt.Sprintf("Scanning %s ...", m.root)),
 		spinner,
-		formatInt(m.progress.Items),
-		tree.FormatSize(m.progress.Bytes),
+		formatInt(atomic.LoadInt64(&m.progress.Items)),
+		tree.FormatSize(atomic.LoadInt64(&m.progress.Bytes)),
 		elapsed,
 		currentPath,
-		StyleHelp.Render("q cancel   Enter view partial results"),
+		StyleHelp.Render("q cancel"),
 	)
 }
 

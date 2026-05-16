@@ -143,8 +143,7 @@ Per-row bar is proportional to `row.Size / max(siblings.Size)`. Sizes right-alig
 | `d`                       | Delete selected (confirmation modal)       |
 | `r`                       | Rescan current folder                      |
 | `g` / `G`                 | Jump to top / bottom of list               |
-| `?`                       | Help overlay                               |
-| `q` / `Esc`               | Quit (Esc closes overlays first)           |
+| `q` / `Esc`               | Quit                                       |
 
 ## Delete flow
 

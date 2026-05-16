@@ -54,12 +54,16 @@ func (m PickerModel) View() string {
 		if i == m.Cursor {
 			prefix = "> "
 		}
+		fraction := 0.0
+		if d.Total > 0 {
+			fraction = float64(d.Total-d.Free) / float64(d.Total)
+		}
 		row := fmt.Sprintf("%s%-6s %-12s %8s   %s  %d%% used",
 			prefix,
 			d.Letter,
 			d.Label,
 			tree.FormatSize(d.Total),
-			Bar(float64(d.Total-d.Free)/float64(d.Total)),
+			Bar(fraction),
 			d.UsedPercent(),
 		)
 		if i == m.Cursor {

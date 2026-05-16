@@ -1,5 +1,47 @@
 # disky
 
-A lightweight terminal disk-space analyzer for Windows.
+A lightweight terminal disk-space analyzer for Windows. Think of it as `ncdu` for Windows: pick a drive, watch a fast parallel scan, then navigate folders sorted by size and delete what you don't need to the Recycle Bin.
 
-Status: in development. See [docs/superpowers/specs/2026-05-16-disky-design.md](docs/superpowers/specs/2026-05-16-disky-design.md).
+## Install
+
+Prerequisites: Go 1.22+ and Windows.
+
+```powershell
+go install github.com/boozercab/disky/cmd/disky@latest
+```
+
+Or build from source:
+
+```powershell
+git clone https://github.com/boozercab/disky.git
+cd disky
+go build -o disky.exe ./cmd/disky
+```
+
+## Usage
+
+```powershell
+disky
+```
+
+You'll get an interactive drive picker, then a progress screen while the drive is scanned, then a sortable folder browser.
+
+### Keys (browser)
+
+| Key                       | Action                                     |
+| ------------------------- | ------------------------------------------ |
+| `↑` / `↓` (or `k` / `j`)  | Move selection                             |
+| `→` / `Enter`             | Enter selected folder                      |
+| `←` / `Backspace` / `h`   | Go to parent                               |
+| `d`                       | Delete selected (Recycle Bin, confirmable) |
+| `r`                       | Rescan current folder                      |
+| `g` / `G`                 | Jump to top / bottom                       |
+| `q` / `Esc`               | Quit                                       |
+
+## Design
+
+See [docs/superpowers/specs/2026-05-16-disky-design.md](docs/superpowers/specs/2026-05-16-disky-design.md) for the full architecture.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

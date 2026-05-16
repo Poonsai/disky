@@ -64,9 +64,11 @@ func (m BrowserModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "r":
 			m.PendingRescan = true
+			return m, tea.Quit
 		case "d":
 			if m.Cursor < len(m.Current.Children) {
 				m.PendingDelete = m.Current.Children[m.Cursor]
+				return m, tea.Quit
 			}
 		case "q", "esc", "ctrl+c":
 			return m, tea.Quit

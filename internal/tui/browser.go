@@ -10,9 +10,10 @@ import (
 )
 
 type BrowserModel struct {
-	Root    *tree.Node
-	Current *tree.Node
-	Cursor  int
+	Root          *tree.Node
+	Current       *tree.Node
+	Cursor        int
+	PendingDelete *tree.Node // set when the user pressed 'd'; cleared on Apply/Cancel
 }
 
 func NewBrowser(root *tree.Node) BrowserModel {
@@ -60,6 +61,10 @@ func (m BrowserModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Current = parent
 				m.Cursor = idx
 			}
+		case "d":
+			if m.Cursor < len(m.Current.Children) {
+				m.PendingDelete = m.Current.Children[m.Cursor]
+			}
 		case "q", "esc", "ctrl+c":
 			return m, tea.Quit
 		}
@@ -104,4 +109,22 @@ func (m BrowserModel) View() string {
 	}
 	b.WriteString("\n" + StyleHelp.Render("↑/↓ select   →/Enter open   ←/Backspace back   d delete   r rescan   q quit") + "\n")
 	return b.String()
+}
+
+// ApplyDelete removes target from the tree and clears PendingDelete.
+// Caller should already have moved the actual filesystem path via recycle.Send.
+func (m BrowserModel) ApplyDelete(target *tree.Node) BrowserModel {
+	tree.RemoveAndRecompute(target)
+	tree.Sort(m.Current)
+	if m.Cursor >= len(m.Current.Children) && m.Cursor > 0 {
+		m.Cursor = len(m.Current.Children) - 1
+	}
+	m.PendingDelete = nil
+	return m
+}
+
+// CancelDelete clears the pending request without touching the tree.
+func (m BrowserModel) CancelDelete() BrowserModel {
+	m.PendingDelete = nil
+	return m
 }

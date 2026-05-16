@@ -71,3 +71,41 @@ func TestBrowserEnterFileIsNoop(t *testing.T) {
 		t.Errorf("enter on file should not change Current")
 	}
 }
+
+func TestBrowserDeleteRequest(t *testing.T) {
+	m := NewBrowser(sampleTree())
+	next, _ := m.Update(tea.KeyMsg{Runes: []rune("d"), Type: tea.KeyRunes})
+	bm := next.(BrowserModel)
+	if bm.PendingDelete == nil {
+		t.Fatal("PendingDelete should be set after 'd'")
+	}
+	if bm.PendingDelete.Name != "sub" {
+		t.Errorf("PendingDelete.Name: got %q, want %q", bm.PendingDelete.Name, "sub")
+	}
+}
+
+func TestBrowserApplyDelete(t *testing.T) {
+	m := NewBrowser(sampleTree())
+	target := m.Current.Children[0] // "sub"
+	m = m.ApplyDelete(target)
+	// "sub" should be gone from root.Children, leaving only "a.txt".
+	if len(m.Current.Children) != 1 || m.Current.Children[0].Name != "a.txt" {
+		t.Errorf("Current.Children after delete: %+v", m.Current.Children)
+	}
+	if m.Root.Size != 30 {
+		t.Errorf("Root.Size: got %d, want 30", m.Root.Size)
+	}
+	// Cursor must remain within bounds.
+	if m.Cursor >= len(m.Current.Children) {
+		t.Errorf("Cursor out of bounds: %d (len=%d)", m.Cursor, len(m.Current.Children))
+	}
+}
+
+func TestBrowserCancelDelete(t *testing.T) {
+	m := NewBrowser(sampleTree())
+	next, _ := m.Update(tea.KeyMsg{Runes: []rune("d"), Type: tea.KeyRunes})
+	m = next.(BrowserModel).CancelDelete()
+	if m.PendingDelete != nil {
+		t.Error("PendingDelete should be cleared after Cancel")
+	}
+}

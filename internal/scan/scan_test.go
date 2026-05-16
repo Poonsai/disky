@@ -13,12 +13,14 @@ import (
 )
 
 // buildTree creates a deterministic temp directory tree for tests:
-//   root/
-//     a.txt          (10 bytes)
-//     sub/
-//       b.txt        (20 bytes)
-//       deep/
-//         c.txt      (40 bytes)
+//
+//	root/
+//	  a.txt          (10 bytes)
+//	  sub/
+//	    b.txt        (20 bytes)
+//	    deep/
+//	      c.txt      (40 bytes)
+//
 // Returns the root path. Cleanup is handled by t.TempDir.
 func buildTree(t *testing.T) string {
 	t.Helper()

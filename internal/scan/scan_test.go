@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 )
 
@@ -90,5 +91,25 @@ func TestScanParallelCorrectness(t *testing.T) {
 	}
 	if len(got.Children) != 50 {
 		t.Errorf("root children: got %d, want 50", len(got.Children))
+	}
+}
+
+func TestScanProgress(t *testing.T) {
+	root := buildTree(t)
+	p := &Progress{}
+
+	_, err := Scan(context.Background(), root, p)
+	if err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+
+	if got := atomic.LoadInt64(&p.Items); got != 3 {
+		t.Errorf("Items: got %d, want 3", got)
+	}
+	if got := atomic.LoadInt64(&p.Bytes); got != 70 {
+		t.Errorf("Bytes: got %d, want 70", got)
+	}
+	if p.CurrentPath() == "" {
+		t.Errorf("CurrentPath should be non-empty after scan")
 	}
 }

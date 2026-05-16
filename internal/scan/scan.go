@@ -8,15 +8,31 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"sync/atomic"
 
 	"github.com/boozercab/disky/internal/tree"
 )
 
 // Progress is updated atomically during a scan so the UI can render counters.
-// Pass nil if progress is not needed.
-type Progress struct{} // expanded in Task 8
+// Use Progress.CurrentPath() to read the latest path string safely.
+type Progress struct {
+	Items       int64
+	Bytes       int64
+	currentPath atomic.Value // string
+}
 
-func Scan(ctx context.Context, root string, _ *Progress) (*tree.Node, error) {
+func (p *Progress) CurrentPath() string {
+	if p == nil {
+		return ""
+	}
+	v := p.currentPath.Load()
+	if v == nil {
+		return ""
+	}
+	return v.(string)
+}
+
+func Scan(ctx context.Context, root string, p *Progress) (*tree.Node, error) {
 	rootNode := &tree.Node{Name: filepath.Clean(root), IsDir: true}
 
 	sem := make(chan struct{}, runtime.NumCPU())
@@ -31,6 +47,10 @@ func Scan(ctx context.Context, root string, _ *Progress) (*tree.Node, error) {
 			defer func() { <-sem }()
 		case <-ctx.Done():
 			return
+		}
+
+		if p != nil {
+			p.currentPath.Store(path)
 		}
 
 		entries, err := os.ReadDir(path)
@@ -57,6 +77,10 @@ func Scan(ctx context.Context, root string, _ *Progress) (*tree.Node, error) {
 				go walk(childPath, child)
 			} else {
 				child.Size = info.Size()
+				if p != nil {
+					atomic.AddInt64(&p.Items, 1)
+					atomic.AddInt64(&p.Bytes, info.Size())
+				}
 			}
 			local = append(local, child)
 		}

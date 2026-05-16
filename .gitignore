@@ -1,0 +1,20 @@
+# Build artifacts
+/disky
+/disky.exe
+/dist/
+
+# Go
+*.test
+*.out
+coverage.out
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Harness state (Claude Code, etc.)
+.claude/

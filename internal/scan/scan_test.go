@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
+	"sync"
 	"testing"
 )
 
@@ -59,5 +61,34 @@ func TestScanBasic(t *testing.T) {
 	sub := got.Children[0]
 	if sub.Size != 60 {
 		t.Errorf("sub size: got %d, want 60", sub.Size)
+	}
+}
+
+func TestScanParallelCorrectness(t *testing.T) {
+	root := t.TempDir()
+	// 50 sibling dirs each with 10 files of 1 byte = 500 bytes total
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			dir := filepath.Join(root, "d"+strconv.Itoa(i))
+			os.Mkdir(dir, 0o755)
+			for j := 0; j < 10; j++ {
+				mustWrite(t, filepath.Join(dir, "f"+strconv.Itoa(j)), 1)
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	got, err := Scan(context.Background(), root, nil)
+	if err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+	if got.Size != 500 {
+		t.Errorf("root size: got %d, want 500", got.Size)
+	}
+	if len(got.Children) != 50 {
+		t.Errorf("root children: got %d, want 50", len(got.Children))
 	}
 }

@@ -6,6 +6,8 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
+	"sync"
 
 	"github.com/boozercab/disky/internal/tree"
 )
@@ -14,46 +16,64 @@ import (
 // Pass nil if progress is not needed.
 type Progress struct{} // expanded in Task 8
 
-// Scan walks root and returns a fully-populated *tree.Node, with Sizes
-// computed bottom-up and Children sorted descending by Size.
-// If ctx is cancelled the scan returns what it has so far along with ctx.Err().
 func Scan(ctx context.Context, root string, _ *Progress) (*tree.Node, error) {
 	rootNode := &tree.Node{Name: filepath.Clean(root), IsDir: true}
-	if err := walkDir(ctx, rootNode.Name, rootNode); err != nil {
-		return rootNode, err
+
+	sem := make(chan struct{}, runtime.NumCPU())
+	var wg sync.WaitGroup
+	var mu sync.Mutex // protects appends to n.Children
+
+	var walk func(path string, n *tree.Node)
+	walk = func(path string, n *tree.Node) {
+		defer wg.Done()
+		select {
+		case sem <- struct{}{}:
+			defer func() { <-sem }()
+		case <-ctx.Done():
+			return
+		}
+
+		entries, err := os.ReadDir(path)
+		if err != nil {
+			mu.Lock()
+			n.Err = err
+			mu.Unlock()
+			return
+		}
+		var local []*tree.Node
+		for _, entry := range entries {
+			childPath := filepath.Join(path, entry.Name())
+			info, err := os.Lstat(childPath)
+			if err != nil {
+				continue
+			}
+			child := &tree.Node{
+				Name:   entry.Name(),
+				Parent: n,
+				IsDir:  info.IsDir(),
+			}
+			if info.IsDir() {
+				wg.Add(1)
+				go walk(childPath, child)
+			} else {
+				child.Size = info.Size()
+			}
+			local = append(local, child)
+		}
+		mu.Lock()
+		n.Children = local
+		mu.Unlock()
 	}
+
+	wg.Add(1)
+	go walk(rootNode.Name, rootNode)
+	wg.Wait()
+
 	tree.ComputeSizes(rootNode)
 	tree.Sort(rootNode)
-	return rootNode, nil
-}
 
-func walkDir(ctx context.Context, path string, n *tree.Node) error {
 	if err := ctx.Err(); err != nil {
-		return err
+		return rootNode, err
 	}
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		n.Err = err
-		return nil
-	}
-	for _, entry := range entries {
-		childPath := filepath.Join(path, entry.Name())
-		info, err := os.Lstat(childPath)
-		if err != nil {
-			continue
-		}
-		child := &tree.Node{
-			Name:   entry.Name(),
-			Parent: n,
-			IsDir:  info.IsDir(),
-		}
-		switch {
-		case info.IsDir():
-			_ = walkDir(ctx, childPath, child)
-		default:
-			child.Size = info.Size()
-		}
-		n.Children = append(n.Children, child)
-	}
-	return nil
+	return rootNode, nil
 }

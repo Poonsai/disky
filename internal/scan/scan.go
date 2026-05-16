@@ -70,12 +70,18 @@ func Scan(ctx context.Context, root string, p *Progress) (*tree.Node, error) {
 			child := &tree.Node{
 				Name:   entry.Name(),
 				Parent: n,
-				IsDir:  info.IsDir(),
+				IsDir:  info.IsDir() && info.Mode()&os.ModeSymlink == 0,
 			}
-			if info.IsDir() {
+			isLink := info.Mode()&os.ModeSymlink != 0
+			switch {
+			case isLink:
+				// Symlinks and Windows junctions are not followed. They count as 0
+				// bytes to avoid double counting and to prevent loops.
+				child.Size = 0
+			case info.IsDir():
 				wg.Add(1)
 				go walk(childPath, child)
-			} else {
+			default:
 				child.Size = info.Size()
 				if p != nil {
 					atomic.AddInt64(&p.Items, 1)

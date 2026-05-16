@@ -140,3 +140,43 @@ func TestScanCancellation(t *testing.T) {
 		t.Errorf("err: got %v, want context.Canceled", err)
 	}
 }
+
+func TestScanSkipsSymlinks(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "target")
+	os.Mkdir(target, 0o755)
+	mustWrite(t, filepath.Join(target, "real.txt"), 50)
+
+	linkPath := filepath.Join(root, "link")
+	if err := os.Symlink(target, linkPath); err != nil {
+		t.Skipf("symlink unsupported in this environment: %v", err)
+	}
+
+	got, err := Scan(context.Background(), root, nil)
+	if err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+
+	var linkNode *struct{ s int64 }
+	for _, c := range got.Children {
+		if c.Name == "link" {
+			linkNode = &struct{ s int64 }{c.Size}
+			if c.IsDir {
+				t.Errorf("link should not be treated as dir")
+			}
+			if len(c.Children) != 0 {
+				t.Errorf("link should have no children: got %d", len(c.Children))
+			}
+		}
+	}
+	if linkNode == nil {
+		t.Fatal("link not found in scan output")
+	}
+	if linkNode.s != 0 {
+		t.Errorf("link size: got %d, want 0 (symlinks count as 0)", linkNode.s)
+	}
+	// Real file should still be counted via the real path.
+	if got.Size != 50 {
+		t.Errorf("root size: got %d, want 50 (link not double-counted)", got.Size)
+	}
+}

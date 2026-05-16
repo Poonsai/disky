@@ -2,12 +2,14 @@ package scan
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // buildTree creates a deterministic temp directory tree for tests:
@@ -111,5 +113,30 @@ func TestScanProgress(t *testing.T) {
 	}
 	if p.CurrentPath() == "" {
 		t.Errorf("CurrentPath should be non-empty after scan")
+	}
+}
+
+func TestScanCancellation(t *testing.T) {
+	root := t.TempDir()
+	// Create a wide tree: 200 dirs, each with 5 files
+	for i := 0; i < 200; i++ {
+		dir := filepath.Join(root, "d"+strconv.Itoa(i))
+		os.Mkdir(dir, 0o755)
+		for j := 0; j < 5; j++ {
+			mustWrite(t, filepath.Join(dir, "f"+strconv.Itoa(j)), 1)
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	// Cancel immediately so workers see a cancelled context on first dequeue.
+	cancel()
+
+	start := time.Now()
+	_, err := Scan(ctx, root, nil)
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Errorf("Scan took too long after cancel: %v", elapsed)
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("err: got %v, want context.Canceled", err)
 	}
 }

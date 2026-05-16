@@ -14,6 +14,7 @@ type BrowserModel struct {
 	Current       *tree.Node
 	Cursor        int
 	PendingDelete *tree.Node // set when the user pressed 'd'; cleared on Apply/Cancel
+	PendingRescan bool
 }
 
 func NewBrowser(root *tree.Node) BrowserModel {
@@ -61,6 +62,8 @@ func (m BrowserModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Current = parent
 				m.Cursor = idx
 			}
+		case "r":
+			m.PendingRescan = true
 		case "d":
 			if m.Cursor < len(m.Current.Children) {
 				m.PendingDelete = m.Current.Children[m.Cursor]
@@ -126,5 +129,30 @@ func (m BrowserModel) ApplyDelete(target *tree.Node) BrowserModel {
 // CancelDelete clears the pending request without touching the tree.
 func (m BrowserModel) CancelDelete() BrowserModel {
 	m.PendingDelete = nil
+	return m
+}
+
+// ApplyRescan replaces the current node's subtree with newCurrent's children
+// and updates its size. It walks the parent chain so ancestor sizes stay
+// consistent. The parent pointers of newCurrent.Children are rewritten to
+// point at m.Current (the old node) so the rest of the tree stays valid.
+func (m BrowserModel) ApplyRescan(newCurrent *tree.Node) BrowserModel {
+	oldSize := m.Current.Size
+	m.Current.Children = newCurrent.Children
+	for _, c := range m.Current.Children {
+		c.Parent = m.Current
+	}
+	m.Current.Size = newCurrent.Size
+	m.Current.Err = newCurrent.Err
+	// Propagate delta up.
+	delta := m.Current.Size - oldSize
+	for cur := m.Current.Parent; cur != nil; cur = cur.Parent {
+		cur.Size += delta
+	}
+	tree.Sort(m.Current)
+	if m.Cursor >= len(m.Current.Children) {
+		m.Cursor = 0
+	}
+	m.PendingRescan = false
 	return m
 }

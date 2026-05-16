@@ -109,3 +109,35 @@ func TestBrowserCancelDelete(t *testing.T) {
 		t.Error("PendingDelete should be cleared after Cancel")
 	}
 }
+
+func TestBrowserRescanRequest(t *testing.T) {
+	m := NewBrowser(sampleTree())
+	next, _ := m.Update(tea.KeyMsg{Runes: []rune("r"), Type: tea.KeyRunes})
+	bm := next.(BrowserModel)
+	if !bm.PendingRescan {
+		t.Error("PendingRescan should be true after 'r'")
+	}
+}
+
+func TestBrowserApplyRescan(t *testing.T) {
+	m := NewBrowser(sampleTree())
+	m.PendingRescan = true
+
+	// Build a replacement subtree for the current folder.
+	newSub := &tree.Node{Name: `C:\`, IsDir: true, Size: 50}
+	newSub.Children = []*tree.Node{
+		{Name: "fresh.txt", Size: 50, Parent: newSub},
+	}
+
+	m = m.ApplyRescan(newSub)
+
+	if m.PendingRescan {
+		t.Error("PendingRescan should be cleared after Apply")
+	}
+	if m.Current.Size != 50 {
+		t.Errorf("Current.Size after rescan: got %d, want 50", m.Current.Size)
+	}
+	if len(m.Current.Children) != 1 || m.Current.Children[0].Name != "fresh.txt" {
+		t.Errorf("Current.Children after rescan: %+v", m.Current.Children)
+	}
+}

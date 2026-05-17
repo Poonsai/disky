@@ -148,6 +148,28 @@ func (m BrowserModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "A":
 			m.Selected = nil
+		case "shift+down", "J":
+			if len(m.Current.Children) > 0 {
+				if m.Selected == nil {
+					m.Selected = map[*tree.Node]struct{}{}
+				}
+				m.Selected[m.Current.Children[m.Cursor]] = struct{}{}
+				if m.Cursor < len(m.Current.Children)-1 {
+					m.Cursor++
+					m.Selected[m.Current.Children[m.Cursor]] = struct{}{}
+				}
+			}
+		case "shift+up", "K":
+			if len(m.Current.Children) > 0 {
+				if m.Selected == nil {
+					m.Selected = map[*tree.Node]struct{}{}
+				}
+				m.Selected[m.Current.Children[m.Cursor]] = struct{}{}
+				if m.Cursor > 0 {
+					m.Cursor--
+					m.Selected[m.Current.Children[m.Cursor]] = struct{}{}
+				}
+			}
 		case "q", "esc", "ctrl+c":
 			return m, tea.Quit
 		}

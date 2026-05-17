@@ -551,6 +551,132 @@ func TestBrowserBackClearsSelection(t *testing.T) {
 	}
 }
 
+func TestBrowserShiftDownExtendsSelection(t *testing.T) {
+	m := NewBrowser(wideTree(5))
+	// Cursor at row 0. Shift+Down should select row 0, advance to row 1, and
+	// select row 1.
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftDown})
+	bm := next.(BrowserModel)
+	if bm.Cursor != 1 {
+		t.Errorf("Cursor after Shift+Down: got %d, want 1", bm.Cursor)
+	}
+	if _, ok := bm.Selected[bm.Current.Children[0]]; !ok {
+		t.Errorf("row 0 should be selected after Shift+Down")
+	}
+	if _, ok := bm.Selected[bm.Current.Children[1]]; !ok {
+		t.Errorf("row 1 should be selected after Shift+Down")
+	}
+}
+
+func TestBrowserShiftDownTwiceExtendsByOne(t *testing.T) {
+	m := NewBrowser(wideTree(5))
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftDown})
+	next, _ = next.(BrowserModel).Update(tea.KeyMsg{Type: tea.KeyShiftDown})
+	bm := next.(BrowserModel)
+	if bm.Cursor != 2 {
+		t.Errorf("Cursor after two Shift+Down: got %d, want 2", bm.Cursor)
+	}
+	for i := 0; i <= 2; i++ {
+		if _, ok := bm.Selected[bm.Current.Children[i]]; !ok {
+			t.Errorf("row %d should be selected", i)
+		}
+	}
+}
+
+func TestBrowserShiftUpExtendsSelection(t *testing.T) {
+	m := NewBrowser(wideTree(5))
+	// Move cursor to row 3 via plain Down.
+	for i := 0; i < 3; i++ {
+		next, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = next.(BrowserModel)
+	}
+	if len(m.Selected) != 0 {
+		t.Fatal("plain Down must not select")
+	}
+	su, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftUp})
+	bm := su.(BrowserModel)
+	if bm.Cursor != 2 {
+		t.Errorf("Cursor after Shift+Up: got %d, want 2", bm.Cursor)
+	}
+	for _, i := range []int{2, 3} {
+		if _, ok := bm.Selected[bm.Current.Children[i]]; !ok {
+			t.Errorf("row %d should be selected after Shift+Up", i)
+		}
+	}
+}
+
+func TestBrowserShiftDownAtBottomSelectsButDoesNotMove(t *testing.T) {
+	m := NewBrowser(wideTree(3))
+	// Jump cursor to last row.
+	g, _ := m.Update(tea.KeyMsg{Runes: []rune("G"), Type: tea.KeyRunes})
+	m = g.(BrowserModel)
+	last := m.Cursor
+	sd, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftDown})
+	bm := sd.(BrowserModel)
+	if bm.Cursor != last {
+		t.Errorf("Cursor should stay at last row; got %d, want %d", bm.Cursor, last)
+	}
+	if _, ok := bm.Selected[bm.Current.Children[last]]; !ok {
+		t.Errorf("last row should still be selected")
+	}
+}
+
+func TestBrowserShiftUpAtTopSelectsButDoesNotMove(t *testing.T) {
+	m := NewBrowser(wideTree(3))
+	// Cursor starts at 0.
+	su, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftUp})
+	bm := su.(BrowserModel)
+	if bm.Cursor != 0 {
+		t.Errorf("Cursor should stay at 0; got %d", bm.Cursor)
+	}
+	if _, ok := bm.Selected[bm.Current.Children[0]]; !ok {
+		t.Errorf("row 0 should still be selected")
+	}
+}
+
+func TestBrowserUppercaseJBehavesAsShiftDown(t *testing.T) {
+	m := NewBrowser(wideTree(5))
+	next, _ := m.Update(tea.KeyMsg{Runes: []rune("J"), Type: tea.KeyRunes})
+	bm := next.(BrowserModel)
+	if bm.Cursor != 1 {
+		t.Errorf("Cursor after J: got %d, want 1", bm.Cursor)
+	}
+	for i := 0; i <= 1; i++ {
+		if _, ok := bm.Selected[bm.Current.Children[i]]; !ok {
+			t.Errorf("row %d should be selected after J", i)
+		}
+	}
+}
+
+func TestBrowserUppercaseKBehavesAsShiftUp(t *testing.T) {
+	m := NewBrowser(wideTree(5))
+	for i := 0; i < 2; i++ {
+		next, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = next.(BrowserModel)
+	}
+	next, _ := m.Update(tea.KeyMsg{Runes: []rune("K"), Type: tea.KeyRunes})
+	bm := next.(BrowserModel)
+	if bm.Cursor != 1 {
+		t.Errorf("Cursor after K: got %d, want 1", bm.Cursor)
+	}
+	for _, i := range []int{1, 2} {
+		if _, ok := bm.Selected[bm.Current.Children[i]]; !ok {
+			t.Errorf("row %d should be selected after K", i)
+		}
+	}
+}
+
+func TestBrowserPlainArrowDoesNotSelect(t *testing.T) {
+	m := NewBrowser(wideTree(3))
+	for _, k := range []tea.KeyType{tea.KeyDown, tea.KeyUp, tea.KeyDown} {
+		next, _ := m.Update(tea.KeyMsg{Type: k})
+		m = next.(BrowserModel)
+	}
+	if len(m.Selected) != 0 {
+		t.Errorf("plain navigation must not select; got %d", len(m.Selected))
+	}
+}
+
 // stripANSI removes ANSI CSI escape sequences for plain-text length checks.
 func stripANSI(s string) string {
 	out := make([]rune, 0, len(s))

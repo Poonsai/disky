@@ -15,9 +15,9 @@ type BrowserModel struct {
 	Cursor        int
 	Offset        int                     // first visible index in Current.Children
 	Width, Height int                     // terminal size (set by tea.WindowSizeMsg)
-	Selected      map[*tree.Node]struct{} // multi-select set; nil/empty = no selection
-	PendingDelete *tree.Node              // set when the user pressed 'd'; cleared on Apply/Cancel
-	PendingRescan bool
+	Selected       map[*tree.Node]struct{} // multi-select set; nil/empty = no selection
+	PendingDeletes []*tree.Node            // set when the user pressed 'd'; cleared on Apply/Cancel
+	PendingRescan  bool
 	Toast         string // transient error message; rendered in help slot, cleared on any key
 }
 
@@ -121,8 +121,20 @@ func (m BrowserModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.PendingRescan = true
 			return m, tea.Quit
 		case "d":
+			if len(m.Selected) > 0 {
+				// Take the selection in current-folder display order so the
+				// confirm dialog and recycle loop see a predictable order.
+				var batch []*tree.Node
+				for _, c := range m.Current.Children {
+					if _, ok := m.Selected[c]; ok {
+						batch = append(batch, c)
+					}
+				}
+				m.PendingDeletes = batch
+				return m, tea.Quit
+			}
 			if m.Cursor < len(m.Current.Children) {
-				m.PendingDelete = m.Current.Children[m.Cursor]
+				m.PendingDeletes = []*tree.Node{m.Current.Children[m.Cursor]}
 				return m, tea.Quit
 			}
 		case " ":
@@ -319,7 +331,7 @@ func truncateRunes(s string, budget int) string {
 	return string(r[:budget-1]) + "…"
 }
 
-// ApplyDelete removes target from the tree and clears PendingDelete.
+// ApplyDelete removes target from the tree and clears PendingDeletes.
 // Caller should already have moved the actual filesystem path via recycle.Send.
 func (m BrowserModel) ApplyDelete(target *tree.Node) BrowserModel {
 	tree.RemoveAndRecompute(target)
@@ -330,13 +342,14 @@ func (m BrowserModel) ApplyDelete(target *tree.Node) BrowserModel {
 	if m.Cursor >= len(m.Current.Children) && m.Cursor > 0 {
 		m.Cursor = len(m.Current.Children) - 1
 	}
-	m.PendingDelete = nil
+	m.PendingDeletes = nil
 	return m.adjustOffset()
 }
 
 // CancelDelete clears the pending request without touching the tree.
+// Selection (if any) is preserved so the user can adjust and retry.
 func (m BrowserModel) CancelDelete() BrowserModel {
-	m.PendingDelete = nil
+	m.PendingDeletes = nil
 	return m
 }
 

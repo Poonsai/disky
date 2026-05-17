@@ -86,15 +86,41 @@ func TestBrowserEnterFileIsNoop(t *testing.T) {
 	}
 }
 
-func TestBrowserDeleteRequest(t *testing.T) {
+func TestBrowserDeleteRequestUsesCursorWhenNoSelection(t *testing.T) {
 	m := NewBrowser(sampleTree())
 	next, _ := m.Update(tea.KeyMsg{Runes: []rune("d"), Type: tea.KeyRunes})
 	bm := next.(BrowserModel)
-	if bm.PendingDelete == nil {
-		t.Fatal("PendingDelete should be set after 'd'")
+	if len(bm.PendingDeletes) != 1 {
+		t.Fatalf("PendingDeletes length: got %d, want 1", len(bm.PendingDeletes))
 	}
-	if bm.PendingDelete.Name != "sub" {
-		t.Errorf("PendingDelete.Name: got %q, want %q", bm.PendingDelete.Name, "sub")
+	if bm.PendingDeletes[0].Name != "sub" {
+		t.Errorf("PendingDeletes[0].Name: got %q, want %q", bm.PendingDeletes[0].Name, "sub")
+	}
+}
+
+func TestBrowserDeleteRequestUsesSelectionWhenNonEmpty(t *testing.T) {
+	m := NewBrowser(sampleTree())
+	// Select both children via 'a'.
+	a, _ := m.Update(tea.KeyMsg{Runes: []rune("a"), Type: tea.KeyRunes})
+	m = a.(BrowserModel)
+	next, _ := m.Update(tea.KeyMsg{Runes: []rune("d"), Type: tea.KeyRunes})
+	bm := next.(BrowserModel)
+	if len(bm.PendingDeletes) != 2 {
+		t.Fatalf("PendingDeletes length: got %d, want 2", len(bm.PendingDeletes))
+	}
+	// Order must match Current.Children display order.
+	if bm.PendingDeletes[0] != bm.Current.Children[0] || bm.PendingDeletes[1] != bm.Current.Children[1] {
+		t.Errorf("PendingDeletes order does not match Current.Children order")
+	}
+}
+
+func TestBrowserDeleteOnEmptyFolderIsNoop(t *testing.T) {
+	root := &tree.Node{Name: `C:\`, IsDir: true}
+	m := NewBrowser(root)
+	next, _ := m.Update(tea.KeyMsg{Runes: []rune("d"), Type: tea.KeyRunes})
+	bm := next.(BrowserModel)
+	if len(bm.PendingDeletes) != 0 {
+		t.Errorf("PendingDeletes should be empty on empty folder; got %d", len(bm.PendingDeletes))
 	}
 }
 
@@ -115,12 +141,18 @@ func TestBrowserApplyDelete(t *testing.T) {
 	}
 }
 
-func TestBrowserCancelDelete(t *testing.T) {
+func TestBrowserCancelDeleteClearsPendingButKeepsSelection(t *testing.T) {
 	m := NewBrowser(sampleTree())
-	next, _ := m.Update(tea.KeyMsg{Runes: []rune("d"), Type: tea.KeyRunes})
-	m = next.(BrowserModel).CancelDelete()
-	if m.PendingDelete != nil {
-		t.Error("PendingDelete should be cleared after Cancel")
+	a, _ := m.Update(tea.KeyMsg{Runes: []rune("a"), Type: tea.KeyRunes})
+	m = a.(BrowserModel)
+	d, _ := m.Update(tea.KeyMsg{Runes: []rune("d"), Type: tea.KeyRunes})
+	m = d.(BrowserModel)
+	m = m.CancelDelete()
+	if len(m.PendingDeletes) != 0 {
+		t.Errorf("PendingDeletes should be cleared after Cancel")
+	}
+	if len(m.Selected) != 2 {
+		t.Errorf("Selection should be preserved after Cancel; got %d", len(m.Selected))
 	}
 }
 

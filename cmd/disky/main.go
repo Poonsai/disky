@@ -94,7 +94,7 @@ func browse(root *tree.Node) error {
 		bm = final.(tui.BrowserModel)
 
 		switch {
-		case bm.PendingDelete != nil:
+		case len(bm.PendingDeletes) > 0:
 			bm = handleDelete(bm)
 		case bm.PendingRescan:
 			bm = handleRescan(bm)
@@ -106,13 +106,18 @@ func browse(root *tree.Node) error {
 }
 
 func handleDelete(bm tui.BrowserModel) tui.BrowserModel {
-	target := bm.PendingDelete
-	itemCount := 0
-	if target.IsDir {
-		itemCount = countItems(target)
+	targets := bm.PendingDeletes
+
+	// Build confirm items.
+	items := make([]tui.ConfirmItem, 0, len(targets))
+	for _, t := range targets {
+		count := 0
+		if t.IsDir {
+			count = countItems(t)
+		}
+		items = append(items, tui.ConfirmItem{Path: t.Path(), Size: t.Size, ItemCount: count})
 	}
 
-	items := []tui.ConfirmItem{{Path: target.Path(), Size: target.Size, ItemCount: itemCount}}
 	cm := tui.NewConfirm(items)
 	final, err := tea.NewProgram(cm, tea.WithAltScreen()).Run()
 	if err != nil {
@@ -122,12 +127,23 @@ func handleDelete(bm tui.BrowserModel) tui.BrowserModel {
 		return bm.CancelDelete()
 	}
 
-	if err := recycle.Send(target.Path()); err != nil {
-		bm = bm.CancelDelete()
-		bm.Toast = fmt.Sprintf("could not delete %s: %v", target.Name, err)
-		return bm
+	// Single-item path keeps the old behavior — gives Task 7 a clean diff
+	// to extend into a batch loop.
+	if len(targets) == 1 {
+		target := targets[0]
+		if err := recycle.Send(target.Path()); err != nil {
+			bm = bm.CancelDelete()
+			bm.Toast = fmt.Sprintf("could not delete %s: %v", target.Name, err)
+			return bm
+		}
+		return bm.ApplyDelete(target)
 	}
-	return bm.ApplyDelete(target)
+
+	// Multi-item: stub for now — clear pending, set a toast pointing at the
+	// follow-up task. Replaced in Task 7.
+	bm = bm.CancelDelete()
+	bm.Toast = "multi-delete not yet wired (Task 7)"
+	return bm
 }
 
 func handleRescan(bm tui.BrowserModel) tui.BrowserModel {

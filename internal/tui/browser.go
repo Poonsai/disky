@@ -128,12 +128,31 @@ func (m BrowserModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m BrowserModel) View() string {
 	var b strings.Builder
-	// Header: path + total size.
-	header := fmt.Sprintf("%s    %s",
-		StyleTitle.Render(m.Current.Path()),
-		tree.FormatSize(m.Current.Size),
-	)
-	b.WriteString(header + "\n\n")
+
+	width := m.Width
+	if width <= 0 {
+		width = 80
+	}
+
+	// Header: bolded path on the left, total size right-aligned, with a
+	// horizontal rule below so it's obvious where the user is regardless
+	// of what's in the terminal scrollback above.
+	pathStr := m.Current.Path()
+	sizeStr := tree.FormatSize(m.Current.Size)
+	maxPath := width - len(sizeStr) - 2
+	if maxPath < 10 {
+		maxPath = 10
+	}
+	if len(pathStr) > maxPath {
+		pathStr = "…" + pathStr[len(pathStr)-maxPath+1:]
+	}
+	pad := width - len(pathStr) - len(sizeStr)
+	if pad < 1 {
+		pad = 1
+	}
+	header := StyleTitle.Render(pathStr) + strings.Repeat(" ", pad) + sizeStr
+	b.WriteString(header + "\n")
+	b.WriteString(StyleDim.Render(strings.Repeat("─", width)) + "\n")
 
 	n := len(m.Current.Children)
 	if n == 0 {

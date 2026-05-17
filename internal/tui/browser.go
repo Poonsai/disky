@@ -156,7 +156,7 @@ func (m BrowserModel) View() string {
 
 	n := len(m.Current.Children)
 	if n == 0 {
-		b.WriteString(StyleDim.Render("  (empty)") + "\n\n")
+		b.WriteString(StyleDim.Render("  (empty)") + "\n")
 	} else {
 		// Bar fraction is relative to the largest sibling overall so the
 		// visible rows stay comparable as the viewport scrolls.
@@ -197,7 +197,7 @@ func (m BrowserModel) View() string {
 		}
 		help = fmt.Sprintf("%s   [%d-%d / %d]", help, m.Offset+1, end, n)
 	}
-	b.WriteString("\n" + StyleHelp.Render(help) + "\n")
+	b.WriteString("\n" + StyleHelp.Render(help))
 	return b.String()
 }
 

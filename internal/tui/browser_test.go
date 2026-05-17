@@ -773,3 +773,18 @@ func stripANSI(s string) string {
 	}
 	return string(out)
 }
+
+func TestBrowserHelpLineMentionsSelection(t *testing.T) {
+	m := NewBrowser(sampleTree())
+	m.Width = 200 // wide enough to render the full help line
+	m.Height = 24
+	out := m.View()
+	for _, want := range []string{"navigate", "Space select", "Shift+", "a all", "A clear", "d delete"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("help line missing %q; got:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "↑/↓ select") {
+		t.Errorf("help line still says '↑/↓ select'; should say 'navigate'")
+	}
+}

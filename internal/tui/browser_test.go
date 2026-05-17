@@ -428,6 +428,55 @@ func TestBrowserToastRendersInBottomSlot(t *testing.T) {
 	}
 }
 
+func TestBrowserSpaceTogglesCursorItem(t *testing.T) {
+	m := NewBrowser(sampleTree())
+	// Toggle on (cursor at row 0 = "sub").
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	bm := next.(BrowserModel)
+	if _, ok := bm.Selected[bm.Current.Children[0]]; !ok {
+		t.Errorf("Selected should include the cursor row after Space")
+	}
+	// Toggle off — same key on the same row.
+	next, _ = bm.Update(tea.KeyMsg{Type: tea.KeySpace})
+	bm = next.(BrowserModel)
+	if _, ok := bm.Selected[bm.Current.Children[0]]; ok {
+		t.Errorf("Selected should be empty after second Space on same row")
+	}
+}
+
+func TestBrowserSelectedRowRendersStarMarker(t *testing.T) {
+	m := NewBrowser(sampleTree())
+	m.Width = 80
+	m.Height = 24
+	// Move cursor off row 0 so the marker isn't masked by cursor styling.
+	down, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = down.(BrowserModel)
+	space, _ := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	m = space.(BrowserModel)
+	// Move cursor back to row 0 so the selection on row 1 ("a.txt") is the
+	// only star marker in the view.
+	up, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = up.(BrowserModel)
+
+	out := m.View()
+	// The selected row (a.txt) should carry a "* " marker.
+	if !strings.Contains(out, "*   a.txt") && !strings.Contains(out, "* a.txt") {
+		t.Errorf("selected row missing star marker; got:\n%s", out)
+	}
+}
+
+func TestBrowserUnselectedRowsHaveBlankMarkerSlot(t *testing.T) {
+	// Sanity: when nothing is selected, no rows should carry a '*' anywhere.
+	m := NewBrowser(sampleTree())
+	m.Width = 80
+	m.Height = 24
+	out := m.View()
+	if strings.Contains(out, "* ") && !strings.Contains(out, "Space select") {
+		// help line could legitimately contain "Space select" but no "* ".
+		t.Errorf("no row should show a star marker; got:\n%s", out)
+	}
+}
+
 // stripANSI removes ANSI CSI escape sequences for plain-text length checks.
 func stripANSI(s string) string {
 	out := make([]rune, 0, len(s))

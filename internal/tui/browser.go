@@ -13,9 +13,10 @@ type BrowserModel struct {
 	Root          *tree.Node
 	Current       *tree.Node
 	Cursor        int
-	Offset        int        // first visible index in Current.Children
-	Width, Height int        // terminal size (set by tea.WindowSizeMsg)
-	PendingDelete *tree.Node // set when the user pressed 'd'; cleared on Apply/Cancel
+	Offset        int                     // first visible index in Current.Children
+	Width, Height int                     // terminal size (set by tea.WindowSizeMsg)
+	Selected      map[*tree.Node]struct{} // multi-select set; nil/empty = no selection
+	PendingDelete *tree.Node              // set when the user pressed 'd'; cleared on Apply/Cancel
 	PendingRescan bool
 	Toast         string // transient error message; rendered in help slot, cleared on any key
 }
@@ -122,6 +123,18 @@ func (m BrowserModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.PendingDelete = m.Current.Children[m.Cursor]
 				return m, tea.Quit
 			}
+		case " ":
+			if m.Cursor < len(m.Current.Children) {
+				node := m.Current.Children[m.Cursor]
+				if m.Selected == nil {
+					m.Selected = map[*tree.Node]struct{}{}
+				}
+				if _, ok := m.Selected[node]; ok {
+					delete(m.Selected, node)
+				} else {
+					m.Selected[node] = struct{}{}
+				}
+			}
 		case "q", "esc", "ctrl+c":
 			return m, tea.Quit
 		}
@@ -175,11 +188,12 @@ func (m BrowserModel) View() string {
 		if end > n {
 			end = n
 		}
-		// Row layout: "  %10s  %12s  %s%s" = 2 + 10 + 2 + 12 + 2 = 28 fixed
-		// cells plus optional 4-cell "[!] " marker, plus the name. Truncate
-		// the name so each row stays on ONE terminal line — wrapping would
+		// Row layout: "  %10s  %12s  %s%s%s" = 2 + 10 + 2 + 12 + 2 + 2 = 30 fixed
+		// cells plus optional 4-cell "[!] " marker, plus the name. The extra
+		// 2 cells are the selection marker slot ("* " or "  "). Truncate the
+		// name so each row stays on ONE terminal line — wrapping would
 		// inflate row count and overflow the viewport, hiding the header.
-		const fixedCells = 16 + BarWidth
+		const fixedCells = 18 + BarWidth
 		for i := m.Offset; i < end; i++ {
 			c := m.Current.Children[i]
 			markerCells := 0
@@ -197,9 +211,14 @@ func (m BrowserModel) View() string {
 				if c.Err != nil {
 					plainMarker = "[!] "
 				}
-				row := fmt.Sprintf("  %10s  %s  %s%s",
+				selMarker := "  "
+				if _, ok := m.Selected[c]; ok {
+					selMarker = "* "
+				}
+				row := fmt.Sprintf("  %10s  %s  %s%s%s",
 					tree.FormatSize(c.Size),
 					barPlain(float64(c.Size)/float64(maxSize)),
+					selMarker,
 					plainMarker,
 					name,
 				)
@@ -212,9 +231,14 @@ func (m BrowserModel) View() string {
 			if c.Err != nil {
 				marker = StyleError.Render("[!] ")
 			}
-			row := fmt.Sprintf("  %10s  %s  %s%s",
+			selMarker := "  "
+			if _, ok := m.Selected[c]; ok {
+				selMarker = "* "
+			}
+			row := fmt.Sprintf("  %10s  %s  %s%s%s",
 				tree.FormatSize(c.Size),
 				Bar(float64(c.Size)/float64(maxSize)),
+				selMarker,
 				marker,
 				name,
 			)

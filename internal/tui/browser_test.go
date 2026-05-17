@@ -455,7 +455,7 @@ func TestBrowserToastRendersInBottomSlot(t *testing.T) {
 		t.Errorf("View should render toast text; got:\n%s", out)
 	}
 	// Normal help line should NOT appear while toast is up.
-	if strings.Contains(out, "d delete   r rescan") {
+	if strings.Contains(out, "d delete  r rescan") {
 		t.Error("help line should be replaced by toast")
 	}
 }
@@ -779,12 +779,12 @@ func TestBrowserHelpLineMentionsSelection(t *testing.T) {
 	m.Width = 200 // wide enough to render the full help line
 	m.Height = 24
 	out := m.View()
-	for _, want := range []string{"navigate", "Space select", "Shift+", "a all", "A clear", "d delete"} {
+	for _, want := range []string{"nav", "Space sel", "all/clear", "d delete"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("help line missing %q; got:\n%s", want, out)
 		}
 	}
 	if strings.Contains(out, "↑/↓ select") {
-		t.Errorf("help line still says '↑/↓ select'; should say 'navigate'")
+		t.Errorf("help line still says '↑/↓ select'; should say 'nav'")
 	}
 }

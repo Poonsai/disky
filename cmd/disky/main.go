@@ -48,7 +48,7 @@ func pickDrive() (*drives.Drive, error) {
 		return nil, fmt.Errorf("no drives found")
 	}
 
-	final, err := tea.NewProgram(tui.NewPicker(list)).Run()
+	final, err := tea.NewProgram(tui.NewPicker(list), tea.WithAltScreen()).Run()
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func pickDrive() (*drives.Drive, error) {
 }
 
 func runScan(root string) (*tree.Node, error) {
-	final, err := tea.NewProgram(tui.NewProgress(root)).Run()
+	final, err := tea.NewProgram(tui.NewProgress(root), tea.WithAltScreen()).Run()
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func runScan(root string) (*tree.Node, error) {
 func browse(root *tree.Node) error {
 	bm := tui.NewBrowser(root)
 	for {
-		final, err := tea.NewProgram(bm).Run()
+		final, err := tea.NewProgram(bm, tea.WithAltScreen()).Run()
 		if err != nil {
 			return err
 		}
@@ -97,7 +97,7 @@ func handleDelete(bm tui.BrowserModel) tui.BrowserModel {
 	}
 
 	cm := tui.NewConfirm(target.Path(), target.Size, itemCount)
-	final, err := tea.NewProgram(cm).Run()
+	final, err := tea.NewProgram(cm, tea.WithAltScreen()).Run()
 	if err != nil {
 		return bm.CancelDelete()
 	}
@@ -116,7 +116,7 @@ func handleDelete(bm tui.BrowserModel) tui.BrowserModel {
 
 func handleRescan(bm tui.BrowserModel) tui.BrowserModel {
 	path := bm.Current.Path()
-	final, err := tea.NewProgram(tui.NewProgress(path)).Run()
+	final, err := tea.NewProgram(tui.NewProgress(path), tea.WithAltScreen()).Run()
 	if err != nil {
 		return bm.CancelRescan()
 	}

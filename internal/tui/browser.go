@@ -10,15 +10,15 @@ import (
 )
 
 type BrowserModel struct {
-	Root          *tree.Node
-	Current       *tree.Node
-	Cursor        int
-	Offset        int                     // first visible index in Current.Children
-	Width, Height int                     // terminal size (set by tea.WindowSizeMsg)
+	Root           *tree.Node
+	Current        *tree.Node
+	Cursor         int
+	Offset         int                     // first visible index in Current.Children
+	Width, Height  int                     // terminal size (set by tea.WindowSizeMsg)
 	Selected       map[*tree.Node]struct{} // multi-select set; nil/empty = no selection
 	PendingDeletes []*tree.Node            // set when the user pressed 'd'; cleared on Apply/Cancel
 	PendingRescan  bool
-	Toast         string // transient error message; rendered in help slot, cleared on any key
+	Toast          string // transient error message; rendered in help slot, cleared on any key
 }
 
 func NewBrowser(root *tree.Node) BrowserModel {

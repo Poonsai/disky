@@ -112,7 +112,8 @@ func handleDelete(bm tui.BrowserModel) tui.BrowserModel {
 		itemCount = countItems(target)
 	}
 
-	cm := tui.NewConfirm(target.Path(), target.Size, itemCount)
+	items := []tui.ConfirmItem{{Path: target.Path(), Size: target.Size, ItemCount: itemCount}}
+	cm := tui.NewConfirm(items)
 	final, err := tea.NewProgram(cm, tea.WithAltScreen()).Run()
 	if err != nil {
 		return bm.CancelDelete()

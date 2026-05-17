@@ -49,7 +49,11 @@ func (m ConfirmModel) View() string {
 	b.WriteString(StyleTitle.Render("Move to Recycle Bin?") + "\n\n")
 	b.WriteString("  " + m.Path + "\n")
 	if m.ItemCount > 0 {
-		b.WriteString(fmt.Sprintf("  %d items, %s\n", m.ItemCount, tree.FormatSize(m.Size)))
+		noun := "items"
+		if m.ItemCount == 1 {
+			noun = "item"
+		}
+		b.WriteString(fmt.Sprintf("  %d %s, %s\n", m.ItemCount, noun, tree.FormatSize(m.Size)))
 	} else {
 		b.WriteString("  " + tree.FormatSize(m.Size) + "\n")
 	}

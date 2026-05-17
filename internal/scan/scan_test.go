@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -71,20 +70,18 @@ func TestScanBasic(t *testing.T) {
 
 func TestScanParallelCorrectness(t *testing.T) {
 	root := t.TempDir()
-	// 50 sibling dirs each with 10 files of 1 byte = 500 bytes total
-	var wg sync.WaitGroup
+	// 50 sibling dirs each with 10 files of 1 byte = 500 bytes total.
+	// Built synchronously: t.Fatal must only be called from the test
+	// goroutine, so mustWrite isn't safe inside spawned goroutines.
 	for i := 0; i < 50; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			dir := filepath.Join(root, "d"+strconv.Itoa(i))
-			os.Mkdir(dir, 0o755)
-			for j := 0; j < 10; j++ {
-				mustWrite(t, filepath.Join(dir, "f"+strconv.Itoa(j)), 1)
-			}
-		}(i)
+		dir := filepath.Join(root, "d"+strconv.Itoa(i))
+		if err := os.Mkdir(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for j := 0; j < 10; j++ {
+			mustWrite(t, filepath.Join(dir, "f"+strconv.Itoa(j)), 1)
+		}
 	}
-	wg.Wait()
 
 	got, err := Scan(context.Background(), root, nil)
 	if err != nil {
@@ -123,7 +120,9 @@ func TestScanCancellation(t *testing.T) {
 	// Create a wide tree: 200 dirs, each with 5 files
 	for i := 0; i < 200; i++ {
 		dir := filepath.Join(root, "d"+strconv.Itoa(i))
-		os.Mkdir(dir, 0o755)
+		if err := os.Mkdir(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
 		for j := 0; j < 5; j++ {
 			mustWrite(t, filepath.Join(dir, "f"+strconv.Itoa(j)), 1)
 		}
@@ -146,7 +145,9 @@ func TestScanCancellation(t *testing.T) {
 func TestScanSkipsSymlinks(t *testing.T) {
 	root := t.TempDir()
 	target := filepath.Join(root, "target")
-	os.Mkdir(target, 0o755)
+	if err := os.Mkdir(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	mustWrite(t, filepath.Join(target, "real.txt"), 50)
 
 	linkPath := filepath.Join(root, "link")

@@ -17,6 +17,7 @@ type BrowserModel struct {
 	Width, Height int        // terminal size (set by tea.WindowSizeMsg)
 	PendingDelete *tree.Node // set when the user pressed 'd'; cleared on Apply/Cancel
 	PendingRescan bool
+	Toast         string // transient error message; rendered in help slot, cleared on any key
 }
 
 func NewBrowser(root *tree.Node) BrowserModel {
@@ -74,6 +75,8 @@ func (m BrowserModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Height = msg.Height
 		return m.adjustOffset(), nil
 	case tea.KeyMsg:
+		// Any key dismisses a transient error toast.
+		m.Toast = ""
 		switch msg.String() {
 		case "up", "k":
 			if m.Cursor > 0 {
@@ -136,17 +139,18 @@ func (m BrowserModel) View() string {
 
 	// Header: bolded path on the left, total size right-aligned, with a
 	// horizontal rule below so it's obvious where the user is regardless
-	// of what's in the terminal scrollback above.
+	// of what's in the terminal scrollback above. Length math uses runes
+	// (not bytes) so non-ASCII paths don't get cut mid-codepoint.
 	pathStr := m.Current.Path()
 	sizeStr := tree.FormatSize(m.Current.Size)
-	maxPath := width - len(sizeStr) - 2
+	maxPath := width - runeLen(sizeStr) - 2
 	if maxPath < 10 {
 		maxPath = 10
 	}
-	if len(pathStr) > maxPath {
-		pathStr = "…" + pathStr[len(pathStr)-maxPath+1:]
+	if pathRunes := []rune(pathStr); len(pathRunes) > maxPath {
+		pathStr = "…" + string(pathRunes[len(pathRunes)-maxPath+1:])
 	}
-	pad := width - len(pathStr) - len(sizeStr)
+	pad := width - runeLen(pathStr) - runeLen(sizeStr)
 	if pad < 1 {
 		pad = 1
 	}
@@ -171,17 +175,26 @@ func (m BrowserModel) View() string {
 		if end > n {
 			end = n
 		}
+		// Row layout: "  %10s  %12s  %s%s" = 2 + 10 + 2 + 12 + 2 = 28 fixed
+		// cells plus optional 4-cell "[!] " marker, plus the name. Truncate
+		// the name so each row stays on ONE terminal line — wrapping would
+		// inflate row count and overflow the viewport, hiding the header.
+		const fixedCells = 28
 		for i := m.Offset; i < end; i++ {
 			c := m.Current.Children[i]
 			marker := ""
+			markerCells := 0
 			if c.Err != nil {
 				marker = StyleError.Render("[!] ")
+				markerCells = 4
 			}
+			nameBudget := width - fixedCells - markerCells
+			name := truncateRunes(c.Name, nameBudget)
 			row := fmt.Sprintf("  %10s  %s  %s%s",
 				tree.FormatSize(c.Size),
 				Bar(float64(c.Size)/float64(maxSize)),
 				marker,
-				c.Name,
+				name,
 			)
 			if i == m.Cursor {
 				row = StyleSelected.Render(row)
@@ -189,16 +202,43 @@ func (m BrowserModel) View() string {
 			b.WriteString(row + "\n")
 		}
 	}
-	help := "↑/↓ select   →/Enter open   ←/Backspace back   d delete   r rescan   q quit"
-	if n > m.viewportRows() {
-		end := m.Offset + m.viewportRows()
-		if end > n {
-			end = n
+	// Bottom slot: error toast takes priority over the normal help line.
+	// Either way it's exactly one row to keep the viewport math correct.
+	var bottom string
+	if m.Toast != "" {
+		bottom = StyleError.Render(truncateRunes(m.Toast, width))
+	} else {
+		help := "↑/↓ select   →/Enter open   ←/Backspace back   d delete   r rescan   q quit"
+		if n > m.viewportRows() {
+			end := m.Offset + m.viewportRows()
+			if end > n {
+				end = n
+			}
+			help = fmt.Sprintf("%s   [%d-%d / %d]", help, m.Offset+1, end, n)
 		}
-		help = fmt.Sprintf("%s   [%d-%d / %d]", help, m.Offset+1, end, n)
+		bottom = StyleHelp.Render(truncateRunes(help, width))
 	}
-	b.WriteString("\n" + StyleHelp.Render(help))
+	b.WriteString("\n" + bottom)
 	return b.String()
+}
+
+// runeLen returns the rune count of s. Cheaper-to-write alias.
+func runeLen(s string) int { return len([]rune(s)) }
+
+// truncateRunes returns s truncated to at most budget runes, with an
+// ellipsis appended when truncation happens. budget < 1 returns "".
+func truncateRunes(s string, budget int) string {
+	if budget < 1 {
+		return ""
+	}
+	r := []rune(s)
+	if len(r) <= budget {
+		return s
+	}
+	if budget <= 1 {
+		return string(r[:budget])
+	}
+	return string(r[:budget-1]) + "…"
 }
 
 // ApplyDelete removes target from the tree and clears PendingDelete.

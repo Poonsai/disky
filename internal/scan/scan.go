@@ -13,6 +13,13 @@ import (
 	"github.com/Poonsai/disky/internal/tree"
 )
 
+// Ownership model for the parallel walker:
+// Each goroutine has sole write access to its own *tree.Node (the `n`
+// parameter of walk). No sibling or parent goroutine writes to the same
+// Node. The post-scan reads in ComputeSizes/Sort run on the main
+// goroutine after wg.Wait, which provides the happens-before edge for
+// every write made by the spawned walkers. No mutex needed.
+
 // Progress is updated atomically during a scan so the UI can render counters.
 // Use Progress.CurrentPath() to read the latest path string safely.
 type Progress struct {
@@ -37,7 +44,6 @@ func Scan(ctx context.Context, root string, p *Progress) (*tree.Node, error) {
 
 	sem := make(chan struct{}, runtime.NumCPU())
 	var wg sync.WaitGroup
-	var mu sync.Mutex // protects appends to n.Children
 
 	var walk func(path string, n *tree.Node)
 	walk = func(path string, n *tree.Node) {
@@ -55,9 +61,7 @@ func Scan(ctx context.Context, root string, p *Progress) (*tree.Node, error) {
 
 		entries, err := os.ReadDir(path)
 		if err != nil {
-			mu.Lock()
 			n.Err = err
-			mu.Unlock()
 			return
 		}
 		var local []*tree.Node
@@ -90,9 +94,7 @@ func Scan(ctx context.Context, root string, p *Progress) (*tree.Node, error) {
 			}
 			local = append(local, child)
 		}
-		mu.Lock()
 		n.Children = local
-		mu.Unlock()
 	}
 
 	wg.Add(1)

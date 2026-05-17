@@ -2,7 +2,9 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -296,4 +298,95 @@ func TestBrowserNoScrollWhenListFits(t *testing.T) {
 	if m.Offset != 0 {
 		t.Errorf("Offset on small list: got %d, want 0", m.Offset)
 	}
+}
+
+func TestBrowserHeaderHandlesNonASCIIPath(t *testing.T) {
+	// Path with multibyte runes; byte slicing in the middle would corrupt
+	// UTF-8. The rendered View must still be valid UTF-8.
+	root := &tree.Node{Name: `C:\`, IsDir: true}
+	users := &tree.Node{Name: "Users", IsDir: true, Parent: root}
+	cafe := &tree.Node{Name: "Café", IsDir: true, Parent: users, Size: 1024}
+	docs := &tree.Node{Name: "Документы", IsDir: true, Parent: cafe, Size: 1024}
+	docs.Children = []*tree.Node{{Name: "файл.txt", Size: 1024, Parent: docs}}
+	cafe.Children = []*tree.Node{docs}
+	users.Children = []*tree.Node{cafe}
+	root.Children = []*tree.Node{users}
+
+	m := NewBrowser(root)
+	m.Current = docs
+	m.Width = 40 // force truncation
+	m.Height = 24
+
+	out := m.View()
+	if !utf8.ValidString(out) {
+		t.Error("View output is not valid UTF-8 after path truncation")
+	}
+}
+
+func TestBrowserRowTruncatesLongName(t *testing.T) {
+	root := &tree.Node{Name: `C:\`, IsDir: true}
+	longName := "amd64_microsoft-windows-this-is-a-very-long-package-name-that-would-wrap"
+	root.Children = []*tree.Node{{Name: longName, Size: 100, Parent: root}}
+
+	m := NewBrowser(root)
+	m.Width = 80
+	m.Height = 24
+
+	out := m.View()
+	// Output must NOT contain the full long name (it has to be truncated
+	// to fit on one terminal line; otherwise the viewport math breaks).
+	if strings.Contains(out, longName) {
+		t.Errorf("View should truncate long name; full name still present")
+	}
+	// Every line of the View must be <= width.
+	lines := strings.Split(out, "\n")
+	for i, line := range lines {
+		// Strip ANSI escape sequences for the length check.
+		stripped := stripANSI(line)
+		if utf8.RuneCountInString(stripped) > 80 {
+			t.Errorf("line %d exceeds width 80: %q (%d runes)", i, stripped, utf8.RuneCountInString(stripped))
+		}
+	}
+}
+
+func TestBrowserToastClearsOnKey(t *testing.T) {
+	m := NewBrowser(sampleTree())
+	m.Toast = "scary error"
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	if next.(BrowserModel).Toast != "" {
+		t.Errorf("Toast should clear on key press; got %q", next.(BrowserModel).Toast)
+	}
+}
+
+func TestBrowserToastRendersInBottomSlot(t *testing.T) {
+	m := NewBrowser(sampleTree())
+	m.Width = 80
+	m.Height = 24
+	m.Toast = "could not delete foo: locked"
+	out := m.View()
+	if !strings.Contains(out, "could not delete foo: locked") {
+		t.Errorf("View should render toast text; got:\n%s", out)
+	}
+	// Normal help line should NOT appear while toast is up.
+	if strings.Contains(out, "d delete   r rescan") {
+		t.Error("help line should be replaced by toast")
+	}
+}
+
+// stripANSI removes ANSI CSI escape sequences for plain-text length checks.
+func stripANSI(s string) string {
+	out := make([]rune, 0, len(s))
+	in := []rune(s)
+	for i := 0; i < len(in); i++ {
+		if in[i] == 0x1b && i+1 < len(in) && in[i+1] == '[' {
+			// skip until letter
+			i += 2
+			for i < len(in) && !((in[i] >= 'A' && in[i] <= 'Z') || (in[i] >= 'a' && in[i] <= 'z')) {
+				i++
+			}
+			continue
+		}
+		out = append(out, in[i])
+	}
+	return string(out)
 }

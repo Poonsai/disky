@@ -4,7 +4,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -106,10 +105,9 @@ func handleDelete(bm tui.BrowserModel) tui.BrowserModel {
 	}
 
 	if err := recycle.Send(target.Path()); err != nil {
-		// Print to stderr after Run() returns — proper toast is a follow-up.
-		fmt.Fprintln(os.Stderr, "could not delete:", err)
-		time.Sleep(2 * time.Second)
-		return bm.CancelDelete()
+		bm = bm.CancelDelete()
+		bm.Toast = fmt.Sprintf("could not delete %s: %v", target.Name, err)
+		return bm
 	}
 	return bm.ApplyDelete(target)
 }
@@ -121,16 +119,21 @@ func handleRescan(bm tui.BrowserModel) tui.BrowserModel {
 		return bm.CancelRescan()
 	}
 	pm := final.(tui.ProgressModel)
-	if pm.Result == nil {
+	// pm.Err non-nil today only means context.Canceled (user pressed q).
+	// In either case the tree we got back is partial — applying it would
+	// shrink ancestor totals by the unscanned portion. Treat as cancel.
+	if pm.Err != nil || pm.Result == nil {
 		return bm.CancelRescan()
 	}
 	return bm.ApplyRescan(pm.Result)
 }
 
+// countItems counts the descendants of n (files + subdirectories), not
+// including n itself. So a folder with 3 files reports 3, not 4.
 func countItems(n *tree.Node) int {
-	count := 1
+	count := 0
 	for _, c := range n.Children {
-		count += countItems(c)
+		count += 1 + countItems(c)
 	}
 	return count
 }

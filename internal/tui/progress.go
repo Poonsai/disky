@@ -86,8 +86,11 @@ func (m ProgressModel) View() string {
 	spinner := string(spinnerGlyphs[m.tick%len(spinnerGlyphs)])
 	elapsed := time.Since(m.start).Round(time.Second)
 	currentPath := m.progress.CurrentPath()
-	if len(currentPath) > 70 {
-		currentPath = "…" + currentPath[len(currentPath)-69:]
+	// Slice by runes, not bytes — paths may contain non-ASCII characters
+	// (e.g. user folders with accented names) and cutting mid-rune would
+	// produce invalid UTF-8 that the terminal renders as garbage.
+	if r := []rune(currentPath); len(r) > 70 {
+		currentPath = "…" + string(r[len(r)-69:])
 	}
 	return fmt.Sprintf(
 		"%s\n\n %s %s items  •  %s  •  %s\n   Currently: %s\n\n%s\n",

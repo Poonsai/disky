@@ -99,6 +99,7 @@ func (m BrowserModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if sel.IsDir {
 					m.Current = sel
 					m.Cursor = 0
+					m.Selected = nil
 				}
 			}
 		case "backspace", "left", "h":
@@ -114,6 +115,7 @@ func (m BrowserModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.Current = parent
 				m.Cursor = idx
+				m.Selected = nil
 			}
 		case "r":
 			m.PendingRescan = true

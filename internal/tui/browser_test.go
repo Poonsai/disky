@@ -518,6 +518,40 @@ func TestBrowserShiftAClearsSelection(t *testing.T) {
 }
 
 // stripANSI removes ANSI CSI escape sequences for plain-text length checks.
+func TestBrowserEnterFolderClearsSelection(t *testing.T) {
+	m := NewBrowser(sampleTree())
+	// Select the row that will become the new Current (sub) — the selection
+	// must clear when we navigate INTO it.
+	sp, _ := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	m = sp.(BrowserModel)
+	if len(m.Selected) != 1 {
+		t.Fatal("precondition: Selected should have 1 item")
+	}
+	en, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	bm := en.(BrowserModel)
+	if len(bm.Selected) != 0 {
+		t.Errorf("Selected should be cleared after entering folder; got %d", len(bm.Selected))
+	}
+}
+
+func TestBrowserBackClearsSelection(t *testing.T) {
+	m := NewBrowser(sampleTree())
+	// Navigate into sub, select something, navigate back.
+	en, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = en.(BrowserModel)
+	sp, _ := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	m = sp.(BrowserModel)
+	if len(m.Selected) != 1 {
+		t.Fatal("precondition: Selected should have 1 item in sub")
+	}
+	bk, _ := m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	bm := bk.(BrowserModel)
+	if len(bm.Selected) != 0 {
+		t.Errorf("Selected should be cleared after going back; got %d", len(bm.Selected))
+	}
+}
+
+// stripANSI removes ANSI CSI escape sequences for plain-text length checks.
 func stripANSI(s string) string {
 	out := make([]rune, 0, len(s))
 	in := []rune(s)

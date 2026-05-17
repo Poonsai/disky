@@ -11,8 +11,10 @@ currently-viewed folder and clears on navigation.
 1. User is in the browser viewing a folder.
 2. User moves the cursor to an item and presses `Space` to toggle its selection.
    Selected rows show a `*` marker before the name.
-3. User can repeat `Space` on other rows, press `a` to select everything in the
-   folder, or press `A` (Shift+A) to clear the whole selection.
+3. User can repeat `Space` on other rows, hold `Shift` while pressing `↑`/`↓`
+   (or use `J`/`K`) to range-select consecutive rows, press `a` to select
+   everything in the folder, or press `A` (Shift+A) to clear the whole
+   selection.
 4. User presses `d`:
    - If at least one item is selected, the confirm dialog summarizes the
      selection (count, total size, bullet list of up to 5 paths with
@@ -38,7 +40,7 @@ C:\Users\Boozer\AppData\Local                              4.2 GB
         80 MB  ▌                 Temp
         12 MB                [!] Microsoft
 
-↑/↓ navigate  →/Enter open  ←/Backspace back  Space select  a all  A clear  d delete  r rescan  q quit
+↑/↓ navigate  →/Enter open  ←/Backspace back  Space select  Shift+↑/↓ range  a all  A clear  d delete  r rescan  q quit
 ```
 
 Confirm dialog with three selected:
@@ -76,12 +78,18 @@ Move to Recycle Bin?
 
 ### Keybindings (browser)
 
-| Key       | Action                                          |
-|-----------|-------------------------------------------------|
-| `Space`   | Toggle selection on the cursor row              |
-| `a`       | Select every item in the current folder         |
-| `A`       | Clear the entire selection                      |
-| `d`       | Delete the selection (or cursor row if empty)   |
+| Key                  | Action                                                        |
+|----------------------|---------------------------------------------------------------|
+| `Space`              | Toggle selection on the cursor row                            |
+| `a`                  | Select every item in the current folder                       |
+| `A`                  | Clear the entire selection                                    |
+| `Shift+↓` or `J`     | Select cursor row, move cursor down, select new cursor row    |
+| `Shift+↑` or `K`     | Select cursor row, move cursor up, select new cursor row      |
+| `d`                  | Delete the selection (or cursor row if empty)                 |
+
+Plain `↑` / `↓` / `j` / `k` keep their current behavior — pure cursor
+movement, no selection effect. Range-select is layered on top via the
+shifted/uppercase variants so users who don't need it never trigger it.
 
 All other browser keys keep their current behavior. Navigation keys
 (`Enter`, `Right`, `Backspace`, `Left`, `h`) clear the selection as a
@@ -99,10 +107,17 @@ side-effect, because selection scope is per-folder.
   - `space`: toggle `Current.Children[Cursor]` in `Selected`
   - `a`: insert every `Current.Children[i]` into `Selected`
   - `A`: reset `Selected` to nil
+  - `shift+down` / `J`: select cursor row, move cursor down by 1 (clamped),
+    select new cursor row. No-op when cursor is already at the last row
+    (the row is still selected; cursor doesn't move).
+  - `shift+up` / `K`: select cursor row, move cursor up by 1 (clamped),
+    select new cursor row. No-op for movement at row 0 (the row is still
+    selected; cursor doesn't move).
   - `d`: if `len(Selected) > 0`, set `PendingDeletes` to the selected items
     in current-folder display order; else keep the existing single-item
     behavior using the cursor row.
-  - Navigation keys clear `Selected` before changing `Current` / `Cursor`.
+  - Navigation keys (open/back) clear `Selected` before changing
+    `Current` / `Cursor`.
 - Row layout adds a 2-cell selection slot between the bar and the existing
   `[!]` error marker. The format becomes
   `"  %10s  %s  %s%s%s"` = padding + size + bar + selMarker + errMarker + name.
@@ -114,7 +129,7 @@ side-effect, because selection scope is per-folder.
   and removes successful nodes from `Selected`. Items that failed stay in
   `Selected` so the user can retry.
 - Update help line text:
-  `↑/↓ navigate   →/Enter open   ←/Backspace back   Space select   a all   A clear   d delete   r rescan   q quit`.
+  `↑/↓ navigate   →/Enter open   ←/Backspace back   Space select   Shift+↑/↓ range   a all   A clear   d delete   r rescan   q quit`.
 - `CancelDelete` clears `PendingDeletes` (no other state change). Selection
   is preserved so the user can adjust and retry.
 
@@ -179,6 +194,10 @@ side-effect, because selection scope is per-folder.
 | `d` then cancel via Esc | `PendingDeletes` cleared; selection preserved |
 | Rescan during selection | Selection cleared (stale pointers) |
 | Toast interaction | `Space` keypress dismisses any existing toast first (existing behavior), then toggles selection |
+| `Shift+↓` at the last row | Row gets selected; cursor stays put |
+| `Shift+↑` at row 0 | Row gets selected; cursor stays put |
+| Terminal doesn't report `shift+↑`/`shift+↓` distinctly | `J` / `K` cover the same behavior |
+| `Shift+↓` then plain `↑` | `↑` is pure navigation — no deselect, no anchor reset (no anchor exists). The previously selected rows stay selected. |
 
 ## Testing
 
@@ -193,6 +212,13 @@ side-effect, because selection scope is per-folder.
 - `TestBrowserDeleteFallsBackToCursorWhenSelectionEmpty`
 - `TestBrowserApplyBatchDeleteRemovesSucceededOnly` (succeeded items gone,
   failed item stays in Selected and in tree)
+- `TestBrowserShiftDownExtendsRange` (cursor on row 1, shift+down twice
+  → rows 1, 2, 3 selected, cursor at 3)
+- `TestBrowserShiftUpExtendsRange` (mirror case)
+- `TestBrowserShiftDownAtBottomSelectsButDoesNotMove`
+- `TestBrowserUppercaseJBehavesAsShiftDown` (and `K` as shift+up)
+- `TestBrowserPlainArrowDoesNotSelect` (regression — j/k/↑/↓ leave
+  Selected untouched)
 
 ### `internal/tui/confirm_test.go` additions
 
@@ -220,11 +246,12 @@ Run `disky.exe` against a populated test folder:
 These are listed only to make the boundary clear; they will NOT be built
 under this spec:
 
-- Range selection (`Shift`+`↓` to select-to-here)
 - "Invert selection" command
 - Cross-folder selection (selection that survives navigation)
 - A dedicated "review selected" view
 - Drag-and-paint selection with mouse
+- "Select to anchor" (Shift+Space style where you mark an anchor and a
+  separate keystroke jumps the selection to it)
 
 ## File summary
 

@@ -5,7 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/boozercab/disky/internal/drives"
+	"github.com/Poonsai/disky/internal/drives"
 )
 
 func samplePicker() PickerModel {

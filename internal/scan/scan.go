@@ -10,7 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/boozercab/disky/internal/tree"
+	"github.com/Poonsai/disky/internal/tree"
 )
 
 // Progress is updated atomically during a scan so the UI can render counters.

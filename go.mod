@@ -1,4 +1,4 @@
-module github.com/boozercab/disky
+module github.com/Poonsai/disky
 
 go 1.26.3
 

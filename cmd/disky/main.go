@@ -8,10 +8,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/boozercab/disky/internal/drives"
-	"github.com/boozercab/disky/internal/recycle"
-	"github.com/boozercab/disky/internal/tree"
-	"github.com/boozercab/disky/internal/tui"
+	"github.com/Poonsai/disky/internal/drives"
+	"github.com/Poonsai/disky/internal/recycle"
+	"github.com/Poonsai/disky/internal/tree"
+	"github.com/Poonsai/disky/internal/tui"
 )
 
 func main() {

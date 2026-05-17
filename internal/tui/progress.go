@@ -8,8 +8,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/boozercab/disky/internal/scan"
-	"github.com/boozercab/disky/internal/tree"
+	"github.com/Poonsai/disky/internal/scan"
+	"github.com/Poonsai/disky/internal/tree"
 )
 
 // ProgressModel runs a scan in the background and renders its live counters.

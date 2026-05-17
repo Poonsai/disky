@@ -7,13 +7,13 @@ A lightweight terminal disk-space analyzer for Windows. Think of it as `ncdu` fo
 Prerequisites: Go 1.22+ and Windows. (Current toolchain pinned to 1.26 in `go.mod`; older versions may still compile — try and see.)
 
 ```powershell
-go install github.com/boozercab/disky/cmd/disky@latest
+go install github.com/Poonsai/disky/cmd/disky@latest
 ```
 
 Or build from source:
 
 ```powershell
-git clone https://github.com/boozercab/disky.git
+git clone https://github.com/Poonsai/disky.git
 cd disky
 go build -o disky.exe ./cmd/disky
 ```

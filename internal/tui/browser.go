@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/boozercab/disky/internal/tree"
+	"github.com/Poonsai/disky/internal/tree"
 )
 
 type BrowserModel struct {

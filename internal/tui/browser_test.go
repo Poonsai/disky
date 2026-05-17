@@ -2,14 +2,25 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 
 	"github.com/Poonsai/disky/internal/tree"
 )
+
+// TestMain forces a color profile so lipgloss emits ANSI SGR sequences
+// during tests. Without this, every Render() returns plain text and the
+// styling tests can't distinguish styled from unstyled output.
+func TestMain(m *testing.M) {
+	lipgloss.SetColorProfile(termenv.ANSI256)
+	os.Exit(m.Run())
+}
 
 func sampleTree() *tree.Node {
 	root := &tree.Node{Name: `C:\`, IsDir: true, Size: 130}
@@ -355,6 +366,50 @@ func TestBrowserToastClearsOnKey(t *testing.T) {
 	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	if next.(BrowserModel).Toast != "" {
 		t.Errorf("Toast should clear on key press; got %q", next.(BrowserModel).Toast)
+	}
+}
+
+func TestBrowserCursorRowHasNoInnerResetBeforeName(t *testing.T) {
+	// Regression test for the "selected-row reverse-video breaks at the
+	// Bar boundary" bug. The cursor row's payload must not contain an
+	// inner SGR reset (\x1b[0m) that would terminate StyleSelected's
+	// reverse-video early.
+	root := &tree.Node{Name: `C:\`, IsDir: true}
+	root.Children = []*tree.Node{
+		{Name: "first", Size: 100, Parent: root},
+		{Name: "second", Size: 50, Parent: root},
+	}
+	m := NewBrowser(root)
+	m.Width = 80
+	m.Height = 24
+	// Cursor on row 0 by default.
+	out := m.View()
+
+	// Find the line that contains "first" (the cursor row).
+	var cursorLine string
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "first") && !strings.Contains(line, "second") {
+			cursorLine = line
+			break
+		}
+	}
+	if cursorLine == "" {
+		t.Fatal("did not find cursor row in View output")
+	}
+
+	// The cursor row should start with a reverse-on SGR (\x1b[7m), then
+	// have NO further \x1b[0m until the very end of the row.
+	if !strings.Contains(cursorLine, "\x1b[7m") {
+		t.Errorf("cursor row missing reverse SGR: %q", cursorLine)
+	}
+	resetIdx := strings.Index(cursorLine, "\x1b[0m")
+	// If there's a reset, it must be at or near the end (after "first").
+	// Specifically, no reset should appear before the name text.
+	if resetIdx >= 0 {
+		nameIdx := strings.Index(cursorLine, "first")
+		if resetIdx < nameIdx {
+			t.Errorf("inner SGR reset before name breaks reverse-video; row=%q", cursorLine)
+		}
 	}
 }
 

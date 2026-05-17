@@ -120,10 +120,16 @@ func handleRescan(bm tui.BrowserModel) tui.BrowserModel {
 	}
 	pm := final.(tui.ProgressModel)
 	// pm.Err non-nil today only means context.Canceled (user pressed q).
-	// In either case the tree we got back is partial — applying it would
-	// shrink ancestor totals by the unscanned portion. Treat as cancel.
-	if pm.Err != nil || pm.Result == nil {
-		return bm.CancelRescan()
+	// pm.Result.Err non-nil means the root itself couldn't be read (e.g.
+	// the folder was deleted/renamed/locked between scans). In both
+	// cases the tree we got back doesn't reflect the on-disk state, and
+	// applying it would silently shrink ancestor totals.
+	if pm.Err != nil || pm.Result == nil || pm.Result.Err != nil {
+		bm = bm.CancelRescan()
+		if pm.Result != nil && pm.Result.Err != nil {
+			bm.Toast = fmt.Sprintf("rescan failed: %v", pm.Result.Err)
+		}
+		return bm
 	}
 	return bm.ApplyRescan(pm.Result)
 }

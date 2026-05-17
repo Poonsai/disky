@@ -179,26 +179,45 @@ func (m BrowserModel) View() string {
 		// cells plus optional 4-cell "[!] " marker, plus the name. Truncate
 		// the name so each row stays on ONE terminal line — wrapping would
 		// inflate row count and overflow the viewport, hiding the header.
-		const fixedCells = 28
+		const fixedCells = 16 + BarWidth
 		for i := m.Offset; i < end; i++ {
 			c := m.Current.Children[i]
-			marker := ""
 			markerCells := 0
 			if c.Err != nil {
-				marker = StyleError.Render("[!] ")
 				markerCells = 4
 			}
 			nameBudget := width - fixedCells - markerCells
 			name := truncateRunes(c.Name, nameBudget)
+
+			// Cursor row: render plain text and wrap once in StyleSelected.
+			// Wrapping over already-styled inner segments breaks the reverse
+			// video because each inner Render emits its own \x1b[0m reset.
+			if i == m.Cursor {
+				plainMarker := ""
+				if c.Err != nil {
+					plainMarker = "[!] "
+				}
+				row := fmt.Sprintf("  %10s  %s  %s%s",
+					tree.FormatSize(c.Size),
+					barPlain(float64(c.Size)/float64(maxSize)),
+					plainMarker,
+					name,
+				)
+				b.WriteString(StyleSelected.Render(row) + "\n")
+				continue
+			}
+
+			// Non-cursor row: inner segments are styled (blue bar, red marker).
+			marker := ""
+			if c.Err != nil {
+				marker = StyleError.Render("[!] ")
+			}
 			row := fmt.Sprintf("  %10s  %s  %s%s",
 				tree.FormatSize(c.Size),
 				Bar(float64(c.Size)/float64(maxSize)),
 				marker,
 				name,
 			)
-			if i == m.Cursor {
-				row = StyleSelected.Render(row)
-			}
 			b.WriteString(row + "\n")
 		}
 	}

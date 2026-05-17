@@ -13,6 +13,8 @@ type BrowserModel struct {
 	Root          *tree.Node
 	Current       *tree.Node
 	Cursor        int
+	Offset        int        // first visible index in Current.Children
+	Width, Height int        // terminal size (set by tea.WindowSizeMsg)
 	PendingDelete *tree.Node // set when the user pressed 'd'; cleared on Apply/Cancel
 	PendingRescan bool
 }
@@ -23,9 +25,56 @@ func NewBrowser(root *tree.Node) BrowserModel {
 
 func (m BrowserModel) Init() tea.Cmd { return nil }
 
+// viewportRows reports how many child rows can be shown in the current
+// terminal. View renders 4 lines of chrome (header, blank, blank, help)
+// around the child list. Defaults to 20 when Height hasn't been
+// reported yet (WindowSizeMsg always arrives shortly after Init).
+func (m BrowserModel) viewportRows() int {
+	if m.Height == 0 {
+		return 20
+	}
+	rows := m.Height - 4
+	if rows < 1 {
+		rows = 1
+	}
+	return rows
+}
+
+// adjustOffset clamps Offset so Cursor is visible inside the viewport.
+// Call after any change to Cursor, Current.Children, or Height.
+func (m BrowserModel) adjustOffset() BrowserModel {
+	n := len(m.Current.Children)
+	if n == 0 {
+		m.Offset = 0
+		return m
+	}
+	vp := m.viewportRows()
+	if vp >= n {
+		m.Offset = 0
+		return m
+	}
+	if m.Cursor < m.Offset {
+		m.Offset = m.Cursor
+	} else if m.Cursor >= m.Offset+vp {
+		m.Offset = m.Cursor - vp + 1
+	}
+	if m.Offset+vp > n {
+		m.Offset = n - vp
+	}
+	if m.Offset < 0 {
+		m.Offset = 0
+	}
+	return m
+}
+
 func (m BrowserModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if k, ok := msg.(tea.KeyMsg); ok {
-		switch k.String() {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.Width = msg.Width
+		m.Height = msg.Height
+		return m.adjustOffset(), nil
+	case tea.KeyMsg:
+		switch msg.String() {
 		case "up", "k":
 			if m.Cursor > 0 {
 				m.Cursor--
@@ -74,28 +123,37 @@ func (m BrowserModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 	}
-	return m, nil
+	return m.adjustOffset(), nil
 }
 
 func (m BrowserModel) View() string {
 	var b strings.Builder
-	// Header: path + total size, right-aligned.
+	// Header: path + total size.
 	header := fmt.Sprintf("%s    %s",
 		StyleTitle.Render(m.Current.Path()),
 		tree.FormatSize(m.Current.Size),
 	)
 	b.WriteString(header + "\n\n")
 
-	if len(m.Current.Children) == 0 {
+	n := len(m.Current.Children)
+	if n == 0 {
 		b.WriteString(StyleDim.Render("  (empty)") + "\n\n")
 	} else {
+		// Bar fraction is relative to the largest sibling overall so the
+		// visible rows stay comparable as the viewport scrolls.
 		maxSize := int64(1)
 		for _, c := range m.Current.Children {
 			if c.Size > maxSize {
 				maxSize = c.Size
 			}
 		}
-		for i, c := range m.Current.Children {
+		vp := m.viewportRows()
+		end := m.Offset + vp
+		if end > n {
+			end = n
+		}
+		for i := m.Offset; i < end; i++ {
+			c := m.Current.Children[i]
 			marker := ""
 			if c.Err != nil {
 				marker = StyleError.Render("[!] ")
@@ -112,7 +170,15 @@ func (m BrowserModel) View() string {
 			b.WriteString(row + "\n")
 		}
 	}
-	b.WriteString("\n" + StyleHelp.Render("↑/↓ select   →/Enter open   ←/Backspace back   d delete   r rescan   q quit") + "\n")
+	help := "↑/↓ select   →/Enter open   ←/Backspace back   d delete   r rescan   q quit"
+	if n > m.viewportRows() {
+		end := m.Offset + m.viewportRows()
+		if end > n {
+			end = n
+		}
+		help = fmt.Sprintf("%s   [%d-%d / %d]", help, m.Offset+1, end, n)
+	}
+	b.WriteString("\n" + StyleHelp.Render(help) + "\n")
 	return b.String()
 }
 
@@ -128,7 +194,7 @@ func (m BrowserModel) ApplyDelete(target *tree.Node) BrowserModel {
 		m.Cursor = len(m.Current.Children) - 1
 	}
 	m.PendingDelete = nil
-	return m
+	return m.adjustOffset()
 }
 
 // CancelDelete clears the pending request without touching the tree.
@@ -168,5 +234,5 @@ func (m BrowserModel) ApplyRescan(newCurrent *tree.Node) BrowserModel {
 		m.Cursor = 0
 	}
 	m.PendingRescan = false
-	return m
+	return m.adjustOffset()
 }

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -201,5 +202,98 @@ func TestBrowserApplyRescanResortsAncestors(t *testing.T) {
 	if root.Children[0].Name != "small-sub" {
 		t.Errorf("root.Children[0] after rescan: got %q, want %q",
 			root.Children[0].Name, "small-sub")
+	}
+}
+
+// wideTree builds a root with `n` children, sized so they sort 0..n-1.
+func wideTree(n int) *tree.Node {
+	root := &tree.Node{Name: `C:\`, IsDir: true}
+	for i := 0; i < n; i++ {
+		root.Children = append(root.Children, &tree.Node{
+			Name:   fmt.Sprintf("child-%02d", i),
+			Size:   int64(n - i),
+			Parent: root,
+		})
+	}
+	return root
+}
+
+// browserAt builds a browser model sized so vp == viewportSize children fit.
+// viewportSize > 0.
+func browserAt(viewportSize int, childCount int) BrowserModel {
+	m := NewBrowser(wideTree(childCount))
+	// Layout: 4 chrome rows + viewportSize child rows.
+	m.Height = viewportSize + 4
+	m.Width = 100
+	return m.adjustOffset()
+}
+
+func TestBrowserWindowSizeSetsHeight(t *testing.T) {
+	m := NewBrowser(wideTree(5))
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
+	bm := next.(BrowserModel)
+	if bm.Height != 30 || bm.Width != 80 {
+		t.Errorf("Width/Height: got %d×%d, want 80×30", bm.Width, bm.Height)
+	}
+}
+
+func TestBrowserViewportScrollsDownPastBottom(t *testing.T) {
+	// 30 children, viewport shows 10.
+	m := browserAt(10, 30)
+	// Move cursor to row 15.
+	for i := 0; i < 15; i++ {
+		next, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = next.(BrowserModel)
+	}
+	if m.Cursor != 15 {
+		t.Fatalf("Cursor: got %d, want 15", m.Cursor)
+	}
+	// Cursor must be within [Offset, Offset+vp).
+	if m.Cursor < m.Offset || m.Cursor >= m.Offset+10 {
+		t.Errorf("cursor %d outside viewport [%d, %d)", m.Cursor, m.Offset, m.Offset+10)
+	}
+}
+
+func TestBrowserViewportScrollsUpPastTop(t *testing.T) {
+	m := browserAt(10, 30)
+	// Jump to bottom, then walk back up to row 2.
+	gNext, _ := m.Update(tea.KeyMsg{Runes: []rune("G"), Type: tea.KeyRunes})
+	m = gNext.(BrowserModel)
+	for m.Cursor > 2 {
+		next, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+		m = next.(BrowserModel)
+	}
+	if m.Cursor != 2 {
+		t.Fatalf("Cursor: got %d, want 2", m.Cursor)
+	}
+	if m.Cursor < m.Offset || m.Cursor >= m.Offset+10 {
+		t.Errorf("cursor %d outside viewport [%d, %d)", m.Cursor, m.Offset, m.Offset+10)
+	}
+}
+
+func TestBrowserGJumpAdjustsOffset(t *testing.T) {
+	m := browserAt(10, 30)
+	gNext, _ := m.Update(tea.KeyMsg{Runes: []rune("G"), Type: tea.KeyRunes})
+	m = gNext.(BrowserModel)
+	if m.Cursor != 29 {
+		t.Fatalf("Cursor after G: got %d, want 29", m.Cursor)
+	}
+	if m.Offset != 20 {
+		t.Errorf("Offset after G on 30 children with vp 10: got %d, want 20", m.Offset)
+	}
+	gtNext, _ := m.Update(tea.KeyMsg{Runes: []rune("g"), Type: tea.KeyRunes})
+	m = gtNext.(BrowserModel)
+	if m.Cursor != 0 || m.Offset != 0 {
+		t.Errorf("after g: Cursor=%d, Offset=%d, want 0/0", m.Cursor, m.Offset)
+	}
+}
+
+func TestBrowserNoScrollWhenListFits(t *testing.T) {
+	// Viewport 20, only 5 children. Offset should stay 0 regardless of cursor.
+	m := browserAt(20, 5)
+	gNext, _ := m.Update(tea.KeyMsg{Runes: []rune("G"), Type: tea.KeyRunes})
+	m = gNext.(BrowserModel)
+	if m.Offset != 0 {
+		t.Errorf("Offset on small list: got %d, want 0", m.Offset)
 	}
 }

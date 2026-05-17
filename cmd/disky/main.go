@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -108,7 +109,6 @@ func browse(root *tree.Node) error {
 func handleDelete(bm tui.BrowserModel) tui.BrowserModel {
 	targets := bm.PendingDeletes
 
-	// Build confirm items.
 	items := make([]tui.ConfirmItem, 0, len(targets))
 	for _, t := range targets {
 		count := 0
@@ -127,23 +127,34 @@ func handleDelete(bm tui.BrowserModel) tui.BrowserModel {
 		return bm.CancelDelete()
 	}
 
-	// Single-item path keeps the old behavior — gives Task 7 a clean diff
-	// to extend into a batch loop.
-	if len(targets) == 1 {
-		target := targets[0]
-		if err := recycle.Send(target.Path()); err != nil {
-			bm = bm.CancelDelete()
-			bm.Toast = fmt.Sprintf("could not delete %s: %v", target.Name, err)
-			return bm
+	var succeeded []*tree.Node
+	var failed []string
+	for _, t := range targets {
+		if err := recycle.Send(t.Path()); err != nil {
+			failed = append(failed, t.Name)
+			continue
 		}
-		return bm.ApplyDelete(target)
+		succeeded = append(succeeded, t)
 	}
-
-	// Multi-item: stub for now — clear pending, set a toast pointing at the
-	// follow-up task. Replaced in Task 7.
-	bm = bm.CancelDelete()
-	bm.Toast = "multi-delete not yet wired (Task 7)"
+	bm = bm.ApplyBatchDelete(succeeded)
+	if len(failed) > 0 {
+		bm.Toast = formatBatchFailure(len(succeeded), len(targets), failed)
+	}
 	return bm
+}
+
+// formatBatchFailure produces a one-line summary toast for a batch
+// recycle. Lists up to 3 failed names, summarizing the rest.
+func formatBatchFailure(succeeded, total int, failedNames []string) string {
+	const maxNames = 3
+	shown := failedNames
+	tail := ""
+	if len(failedNames) > maxNames {
+		shown = failedNames[:maxNames]
+		tail = fmt.Sprintf(" and %d more", len(failedNames)-maxNames)
+	}
+	return fmt.Sprintf("deleted %d of %d; failed: %s%s",
+		succeeded, total, strings.Join(shown, ", "), tail)
 }
 
 func handleRescan(bm tui.BrowserModel) tui.BrowserModel {

@@ -709,6 +709,53 @@ func TestBrowserPlainArrowDoesNotSelect(t *testing.T) {
 	}
 }
 
+func TestBrowserApplyBatchDeleteRemovesSucceededOnly(t *testing.T) {
+	root := &tree.Node{Name: `C:\`, IsDir: true, Size: 60}
+	a := &tree.Node{Name: "a", Size: 10, Parent: root}
+	b := &tree.Node{Name: "b", Size: 20, Parent: root}
+	c := &tree.Node{Name: "c", Size: 30, Parent: root}
+	root.Children = []*tree.Node{c, b, a} // sorted descending by size
+
+	m := NewBrowser(root)
+	m.Selected = map[*tree.Node]struct{}{a: {}, c: {}}
+	// Simulate: c succeeded, a failed.
+	m = m.ApplyBatchDelete([]*tree.Node{c})
+
+	// c removed, a and b remain.
+	if len(m.Current.Children) != 2 {
+		t.Fatalf("Current.Children count: got %d, want 2", len(m.Current.Children))
+	}
+	// a stays in Selected (still selected — user may retry).
+	if _, ok := m.Selected[a]; !ok {
+		t.Errorf("failed item 'a' should remain in Selected")
+	}
+	// c is gone from Selected (it was successfully deleted).
+	if _, ok := m.Selected[c]; ok {
+		t.Errorf("succeeded item 'c' should be removed from Selected")
+	}
+	if len(m.PendingDeletes) != 0 {
+		t.Errorf("PendingDeletes should be cleared")
+	}
+}
+
+func TestBrowserApplyRescanClearsSelection(t *testing.T) {
+	m := NewBrowser(sampleTree())
+	a, _ := m.Update(tea.KeyMsg{Runes: []rune("a"), Type: tea.KeyRunes})
+	m = a.(BrowserModel)
+	if len(m.Selected) == 0 {
+		t.Fatal("precondition: Selected should be populated")
+	}
+	m.PendingRescan = true
+
+	newCur := &tree.Node{Name: `C:\`, IsDir: true, Size: 1}
+	newCur.Children = []*tree.Node{{Name: "fresh", Size: 1}}
+
+	m = m.ApplyRescan(newCur)
+	if len(m.Selected) != 0 {
+		t.Errorf("ApplyRescan must clear Selected (stale pointers); got %d", len(m.Selected))
+	}
+}
+
 // stripANSI removes ANSI CSI escape sequences for plain-text length checks.
 func stripANSI(s string) string {
 	out := make([]rune, 0, len(s))

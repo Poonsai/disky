@@ -346,6 +346,25 @@ func (m BrowserModel) ApplyDelete(target *tree.Node) BrowserModel {
 	return m.adjustOffset()
 }
 
+// ApplyBatchDelete removes each successfully-recycled node from the tree,
+// drops it from the Selected set, and clears PendingDeletes. Nodes that
+// failed (i.e. are NOT in succeeded) stay in the tree and stay selected
+// so the user can adjust and retry. Caller is responsible for surfacing
+// a Toast summarizing successes vs failures.
+func (m BrowserModel) ApplyBatchDelete(succeeded []*tree.Node) BrowserModel {
+	for _, n := range succeeded {
+		tree.RemoveAndRecompute(n)
+		delete(m.Selected, n)
+	}
+	tree.Sort(m.Current)
+	tree.SortAncestors(m.Current)
+	if m.Cursor >= len(m.Current.Children) && m.Cursor > 0 {
+		m.Cursor = len(m.Current.Children) - 1
+	}
+	m.PendingDeletes = nil
+	return m.adjustOffset()
+}
+
 // CancelDelete clears the pending request without touching the tree.
 // Selection (if any) is preserved so the user can adjust and retry.
 func (m BrowserModel) CancelDelete() BrowserModel {
@@ -383,6 +402,9 @@ func (m BrowserModel) ApplyRescan(newCurrent *tree.Node) BrowserModel {
 	if m.Cursor >= len(m.Current.Children) {
 		m.Cursor = 0
 	}
+	// Selection holds pointers into the OLD children, which we just
+	// replaced. Stale pointers would point at orphaned tree nodes.
+	m.Selected = nil
 	m.PendingRescan = false
 	return m.adjustOffset()
 }

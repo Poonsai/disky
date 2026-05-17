@@ -477,6 +477,46 @@ func TestBrowserUnselectedRowsHaveBlankMarkerSlot(t *testing.T) {
 	}
 }
 
+func TestBrowserSelectAllPopulatesSelected(t *testing.T) {
+	m := NewBrowser(sampleTree()) // 2 children at root
+	next, _ := m.Update(tea.KeyMsg{Runes: []rune("a"), Type: tea.KeyRunes})
+	bm := next.(BrowserModel)
+	if len(bm.Selected) != len(bm.Current.Children) {
+		t.Errorf("Selected size: got %d, want %d", len(bm.Selected), len(bm.Current.Children))
+	}
+	for _, c := range bm.Current.Children {
+		if _, ok := bm.Selected[c]; !ok {
+			t.Errorf("child %q not in Selected", c.Name)
+		}
+	}
+}
+
+func TestBrowserSelectAllOnEmptyFolderIsNoop(t *testing.T) {
+	root := &tree.Node{Name: `C:\`, IsDir: true}
+	m := NewBrowser(root)
+	next, _ := m.Update(tea.KeyMsg{Runes: []rune("a"), Type: tea.KeyRunes})
+	bm := next.(BrowserModel)
+	if len(bm.Selected) != 0 {
+		t.Errorf("Selected should remain empty in empty folder; got %d", len(bm.Selected))
+	}
+}
+
+func TestBrowserShiftAClearsSelection(t *testing.T) {
+	m := NewBrowser(sampleTree())
+	// Pre-populate via 'a'.
+	aNext, _ := m.Update(tea.KeyMsg{Runes: []rune("a"), Type: tea.KeyRunes})
+	m = aNext.(BrowserModel)
+	if len(m.Selected) == 0 {
+		t.Fatal("precondition: select-all should have populated Selected")
+	}
+	// Clear via 'A'.
+	bigA, _ := m.Update(tea.KeyMsg{Runes: []rune("A"), Type: tea.KeyRunes})
+	m = bigA.(BrowserModel)
+	if len(m.Selected) != 0 {
+		t.Errorf("Selected should be empty after 'A'; got %d", len(m.Selected))
+	}
+}
+
 // stripANSI removes ANSI CSI escape sequences for plain-text length checks.
 func stripANSI(s string) string {
 	out := make([]rune, 0, len(s))

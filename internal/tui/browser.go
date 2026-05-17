@@ -135,6 +135,17 @@ func (m BrowserModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.Selected[node] = struct{}{}
 				}
 			}
+		case "a":
+			if len(m.Current.Children) > 0 {
+				if m.Selected == nil {
+					m.Selected = map[*tree.Node]struct{}{}
+				}
+				for _, c := range m.Current.Children {
+					m.Selected[c] = struct{}{}
+				}
+			}
+		case "A":
+			m.Selected = nil
 		case "q", "esc", "ctrl+c":
 			return m, tea.Quit
 		}

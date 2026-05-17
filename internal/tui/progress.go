@@ -18,6 +18,8 @@ import (
 type ProgressModel struct {
 	root     string
 	progress *scan.Progress
+	ctx      context.Context
+	cancel   context.CancelFunc
 	start    time.Time
 	tick     int // for spinner glyph
 
@@ -34,24 +36,26 @@ type tickMsg struct{}
 
 var spinnerGlyphs = []rune("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")
 
-// NewProgress builds the model. The scan starts on Init.
+// NewProgress builds the model. The scan starts on Init. The cancel func is
+// stored on the model so quit-key handlers can stop the scan goroutine —
+// because cancel is a function value (pointer to a closure), Bubble Tea's
+// value-receiver copies of the model still call the same underlying cancel.
 func NewProgress(root string) ProgressModel {
+	ctx, cancel := context.WithCancel(context.Background())
 	return ProgressModel{
 		root:     root,
 		progress: &scan.Progress{},
+		ctx:      ctx,
+		cancel:   cancel,
 		start:    time.Now(),
 	}
 }
 
 func (m ProgressModel) Init() tea.Cmd {
-	// NOTE: Bubble Tea Init returns tea.Cmd only (no model update), so any cancel
-	// func stored on the model would be lost. The user-facing quit keys return
-	// tea.Quit which tears down the program; the scan goroutine finishes
-	// naturally afterward (wasted I/O is bounded by remaining scan time).
 	return tea.Batch(
 		tickCmd(),
 		func() tea.Msg {
-			root, err := scan.Scan(context.Background(), m.root, m.progress)
+			root, err := scan.Scan(m.ctx, m.root, m.progress)
 			return scanDoneMsg{root: root, err: err}
 		},
 	)
@@ -62,6 +66,9 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "esc", "ctrl+c", "enter":
+			if m.cancel != nil {
+				m.cancel()
+			}
 			return m, tea.Quit
 		}
 	case tickMsg:

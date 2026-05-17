@@ -121,6 +121,9 @@ func (m BrowserModel) View() string {
 func (m BrowserModel) ApplyDelete(target *tree.Node) BrowserModel {
 	tree.RemoveAndRecompute(target)
 	tree.Sort(m.Current)
+	// m.Current's Size shrank, so its position among its siblings — and
+	// every ancestor's position — may be stale. Walk up sorting.
+	tree.SortAncestors(m.Current)
 	if m.Cursor >= len(m.Current.Children) && m.Cursor > 0 {
 		m.Cursor = len(m.Current.Children) - 1
 	}
@@ -131,6 +134,13 @@ func (m BrowserModel) ApplyDelete(target *tree.Node) BrowserModel {
 // CancelDelete clears the pending request without touching the tree.
 func (m BrowserModel) CancelDelete() BrowserModel {
 	m.PendingDelete = nil
+	return m
+}
+
+// CancelRescan clears the pending rescan flag without touching the tree.
+// Mirrors CancelDelete; used when the user cancels the progress screen.
+func (m BrowserModel) CancelRescan() BrowserModel {
+	m.PendingRescan = false
 	return m
 }
 
@@ -152,6 +162,8 @@ func (m BrowserModel) ApplyRescan(newCurrent *tree.Node) BrowserModel {
 		cur.Size += delta
 	}
 	tree.Sort(m.Current)
+	// m.Current's Size may have changed, so ancestor child lists are stale.
+	tree.SortAncestors(m.Current)
 	if m.Cursor >= len(m.Current.Children) {
 		m.Cursor = 0
 	}

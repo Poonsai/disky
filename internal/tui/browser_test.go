@@ -141,3 +141,65 @@ func TestBrowserApplyRescan(t *testing.T) {
 		t.Errorf("Current.Children after rescan: %+v", m.Current.Children)
 	}
 }
+
+func TestBrowserCancelRescan(t *testing.T) {
+	m := NewBrowser(sampleTree())
+	next, _ := m.Update(tea.KeyMsg{Runes: []rune("r"), Type: tea.KeyRunes})
+	m = next.(BrowserModel).CancelRescan()
+	if m.PendingRescan {
+		t.Error("PendingRescan should be cleared after Cancel")
+	}
+}
+
+func TestBrowserApplyDeleteResortsAncestors(t *testing.T) {
+	// Build a 3-level tree where deleting inside "big-sub" makes it
+	// smaller than its sibling "small-sub", so root.Children should
+	// resort.
+	root := &tree.Node{Name: `C:\`, IsDir: true, Size: 250}
+	bigSub := &tree.Node{Name: "big-sub", IsDir: true, Parent: root, Size: 200}
+	target := &tree.Node{Name: "fat.bin", Size: 200, Parent: bigSub}
+	bigSub.Children = []*tree.Node{target}
+
+	smallSub := &tree.Node{Name: "small-sub", IsDir: true, Parent: root, Size: 50}
+	smallSub.Children = []*tree.Node{{Name: "tiny.txt", Size: 50, Parent: smallSub}}
+
+	root.Children = []*tree.Node{bigSub, smallSub}
+
+	// Browse into big-sub and delete its only child.
+	m := NewBrowser(root)
+	m.Current = bigSub
+	m = m.ApplyDelete(target)
+
+	// root.Children must now have small-sub first (50 > 0 after the delete).
+	if root.Children[0].Name != "small-sub" {
+		t.Errorf("root.Children[0] after delete: got %q, want %q",
+			root.Children[0].Name, "small-sub")
+	}
+}
+
+func TestBrowserApplyRescanResortsAncestors(t *testing.T) {
+	// Same setup, but trigger via rescan that shrinks big-sub.
+	root := &tree.Node{Name: `C:\`, IsDir: true, Size: 250}
+	bigSub := &tree.Node{Name: "big-sub", IsDir: true, Parent: root, Size: 200}
+	bigSub.Children = []*tree.Node{{Name: "fat.bin", Size: 200, Parent: bigSub}}
+
+	smallSub := &tree.Node{Name: "small-sub", IsDir: true, Parent: root, Size: 50}
+	smallSub.Children = []*tree.Node{{Name: "tiny.txt", Size: 50, Parent: smallSub}}
+
+	root.Children = []*tree.Node{bigSub, smallSub}
+
+	m := NewBrowser(root)
+	m.Current = bigSub
+	m.PendingRescan = true
+
+	// Replacement subtree: big-sub is now only 10 bytes.
+	newCurrent := &tree.Node{Name: "big-sub", IsDir: true, Size: 10}
+	newCurrent.Children = []*tree.Node{{Name: "trimmed.txt", Size: 10}}
+
+	m = m.ApplyRescan(newCurrent)
+
+	if root.Children[0].Name != "small-sub" {
+		t.Errorf("root.Children[0] after rescan: got %q, want %q",
+			root.Children[0].Name, "small-sub")
+	}
+}

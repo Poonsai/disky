@@ -118,11 +118,11 @@ func handleRescan(bm tui.BrowserModel) tui.BrowserModel {
 	path := bm.Current.Path()
 	final, err := tea.NewProgram(tui.NewProgress(path)).Run()
 	if err != nil {
-		return bm
+		return bm.CancelRescan()
 	}
 	pm := final.(tui.ProgressModel)
 	if pm.Result == nil {
-		return bm
+		return bm.CancelRescan()
 	}
 	return bm.ApplyRescan(pm.Result)
 }

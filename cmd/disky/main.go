@@ -26,9 +26,14 @@ func run() error {
 		return err
 	}
 
-	root, err := runScan(drv.Letter)
+	root, canceled, err := runScan(drv.Letter)
 	if err != nil {
 		return err
+	}
+	if canceled {
+		// User pressed q/esc/ctrl+c. Exit silently rather than printing a
+		// misleading "no entries" message that implies the drive is empty.
+		return nil
 	}
 	if root == nil || len(root.Children) == 0 {
 		fmt.Println("Scan returned no entries.")
@@ -55,16 +60,28 @@ func pickDrive() (*drives.Drive, error) {
 	return pm.Chosen, nil
 }
 
-func runScan(root string) (*tree.Node, error) {
+// runScan returns (tree, canceled, err). canceled is true when the user
+// pressed q/esc/ctrl+c on the progress screen, distinguishing that from a
+// genuinely empty scan or an underlying failure.
+func runScan(root string) (*tree.Node, bool, error) {
 	final, err := tea.NewProgram(tui.NewProgress(root), tea.WithAltScreen()).Run()
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	pm := final.(tui.ProgressModel)
-	if pm.Err != nil {
-		return nil, pm.Err
+	if pm.Canceled {
+		return nil, true, nil
 	}
-	return pm.Result, nil
+	if pm.Err != nil {
+		return nil, false, pm.Err
+	}
+	// The scan can return a non-nil Result with Result.Err set when the root
+	// itself was unreadable (drive ejected, permission denied). Surface that
+	// instead of silently treating the drive as empty.
+	if pm.Result != nil && pm.Result.Err != nil {
+		return nil, false, fmt.Errorf("scan %s: %w", root, pm.Result.Err)
+	}
+	return pm.Result, false, nil
 }
 
 func browse(root *tree.Node) error {
@@ -119,12 +136,13 @@ func handleRescan(bm tui.BrowserModel) tui.BrowserModel {
 		return bm.CancelRescan()
 	}
 	pm := final.(tui.ProgressModel)
-	// pm.Err non-nil today only means context.Canceled (user pressed q).
-	// pm.Result.Err non-nil means the root itself couldn't be read (e.g.
-	// the folder was deleted/renamed/locked between scans). In both
-	// cases the tree we got back doesn't reflect the on-disk state, and
-	// applying it would silently shrink ancestor totals.
-	if pm.Err != nil || pm.Result == nil || pm.Result.Err != nil {
+	// Three "don't apply" cases:
+	//   pm.Canceled       — user pressed q/esc/ctrl+c during rescan
+	//   pm.Result == nil  — scan returned nothing (shouldn't happen, defensive)
+	//   pm.Result.Err     — root path was unreadable mid-rescan (deleted /
+	//                       renamed / locked); applying the partial tree
+	//                       would silently shrink ancestor totals
+	if pm.Canceled || pm.Err != nil || pm.Result == nil || pm.Result.Err != nil {
 		bm = bm.CancelRescan()
 		if pm.Result != nil && pm.Result.Err != nil {
 			bm.Toast = fmt.Sprintf("rescan failed: %v", pm.Result.Err)

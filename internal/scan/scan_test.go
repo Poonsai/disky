@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"sync/atomic"
 	"testing"
@@ -139,6 +140,52 @@ func TestScanCancellation(t *testing.T) {
 	}
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("err: got %v, want context.Canceled", err)
+	}
+}
+
+func TestScanMidWalkCancellationStopsPromptly(t *testing.T) {
+	root := t.TempDir()
+	// Build a deeper tree so the scan has real work to abort mid-flight.
+	// 100 top-level dirs, each with 100 small files, gives the worker
+	// pool plenty of in-progress directories when cancel fires.
+	for i := 0; i < 100; i++ {
+		dir := filepath.Join(root, "d"+strconv.Itoa(i))
+		if err := os.Mkdir(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for j := 0; j < 100; j++ {
+			mustWrite(t, filepath.Join(dir, "f"+strconv.Itoa(j)), 1)
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	// Cancel after the scan has been running for a moment so workers are
+	// actively walking directories, not just sitting on the first pop.
+	go func() {
+		time.Sleep(5 * time.Millisecond)
+		cancel()
+	}()
+
+	before := runtime.NumGoroutine()
+	start := time.Now()
+	_, err := Scan(ctx, root, nil)
+	elapsed := time.Since(start)
+	if elapsed > 2*time.Second {
+		t.Errorf("mid-scan cancel took too long to unwind: %v", elapsed)
+	}
+	// On systems where the entire small tree scans faster than 5ms the
+	// cancel may arrive after natural completion; in that case err is
+	// nil and we have nothing to verify about ctx propagation.
+	if err != nil && !errors.Is(err, context.Canceled) {
+		t.Errorf("err: got %v, want context.Canceled or nil", err)
+	}
+
+	// Give any in-flight workers a tick to drain, then check we
+	// didn't leak goroutines.
+	time.Sleep(100 * time.Millisecond)
+	after := runtime.NumGoroutine()
+	if after > before+2 {
+		t.Errorf("goroutine leak: before=%d after=%d", before, after)
 	}
 }
 

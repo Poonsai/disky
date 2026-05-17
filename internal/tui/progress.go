@@ -23,8 +23,9 @@ type ProgressModel struct {
 	start    time.Time
 	tick     int // for spinner glyph
 
-	Result *tree.Node
-	Err    error
+	Result   *tree.Node
+	Err      error
+	Canceled bool
 }
 
 type scanDoneMsg struct {
@@ -65,10 +66,11 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "q", "esc", "ctrl+c", "enter":
+		case "q", "esc", "ctrl+c":
 			if m.cancel != nil {
 				m.cancel()
 			}
+			m.Canceled = true
 			return m, tea.Quit
 		}
 	case tickMsg:

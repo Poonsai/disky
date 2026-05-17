@@ -25,7 +25,7 @@ A lightweight, terminal-based disk space analyzer for Windows. Run `disky`, pick
 
 1. User runs `disky` (no arguments).
 2. **Drive picker** appears, listing mounted drives with capacity and % used. Arrow keys + Enter to pick.
-3. **Progress screen** shows a live counter while the scan runs: items scanned, bytes scanned, current path, elapsed time, spinner. Cancellable with `q`/`Esc`. Pressing Enter views partial results.
+3. **Progress screen** shows a live counter while the scan runs: items scanned, bytes scanned, current path, elapsed time, spinner. Cancellable with `q`/`Esc`.
 4. **Browser screen** opens at the scan root: current folder path at the top, sorted children below (largest first) with a per-row size bar.
 5. User navigates with arrow keys, deletes selected items to the Recycle Bin with `d` (confirmation modal), quits with `q`.
 
@@ -111,7 +111,7 @@ All three screens are Bubble Tea models. Lipgloss handles styling.
  ⠋ 1,247,891 items  •  342.1 GB  •  00:01:47
    Currently: C:\Users\Boozer\AppData\Local\...\node_modules\@types
 
- q cancel   Enter view partial results
+ q cancel
 ```
 
 Progress updates throttled to ~10/sec to keep render cost negligible while the scan thrashes disk.

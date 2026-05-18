@@ -9,6 +9,36 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 _Nothing yet._
 
+## [1.1.4] — 2026-05-17
+
+### Changed
+
+- **Removed `BrowserModel.ApplyDelete`** (singular). The batch path
+  has been the only production code path since v1.1.0; the helper
+  survived only to support two tests. Those tests now exercise the
+  batch path (`TestBrowserApplyBatchDeleteSingleItem`,
+  `TestBrowserApplyBatchDeleteResortsAncestors`), removing a latent
+  footgun: `ApplyDelete` didn't trim the deleted node from
+  `Selected`, which would have left a dangling pointer if anyone
+  re-introduced a single-item caller.
+- Extracted `runBatchRecycle` from `cmd/disky/main.handleDelete` so
+  the dispatch glue (succeeded/failed partitioning) can be unit-tested
+  without a tea.Program or the real Recycle Bin.
+
+### Fixed
+
+- README key table for `d` now mentions the cursor-row fallback
+  (`Delete selection, or cursor row if none`). The behavior matched
+  the spec since v1.1.0; the table just hadn't been updated.
+
+### Internal
+
+- New tests: four cases for `runBatchRecycle`, two boundary cases for
+  the confirm-dialog bullet truncation (exactly 5 items, just-over at
+  6), and a cursor+selected+error three-way row overlap render check.
+- Tidied an orphan `stripANSI` doc comment that had drifted above an
+  unrelated test during an earlier refactor.
+
 ## [1.1.3] — 2026-05-17
 
 ### Fixed
@@ -83,7 +113,8 @@ _Nothing yet._
 - Honest error reporting from the Recycle Bin call — non-recyclable items
   return an HRESULT instead of silently permanent-deleting.
 
-[Unreleased]: https://github.com/Poonsai/disky/compare/v1.1.3...HEAD
+[Unreleased]: https://github.com/Poonsai/disky/compare/v1.1.4...HEAD
+[1.1.4]: https://github.com/Poonsai/disky/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/Poonsai/disky/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/Poonsai/disky/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/Poonsai/disky/compare/v1.1.0...v1.1.1

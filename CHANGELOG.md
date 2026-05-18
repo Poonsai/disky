@@ -7,6 +7,10 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.1.1] — 2026-05-17
+
 ### Added
 
 - `--version` / `-v` flag prints the version and exits. Release binaries
@@ -56,6 +60,7 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Honest error reporting from the Recycle Bin call — non-recyclable items
   return an HRESULT instead of silently permanent-deleting.
 
-[Unreleased]: https://github.com/Poonsai/disky/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Poonsai/disky/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/Poonsai/disky/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/Poonsai/disky/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Poonsai/disky/releases/tag/v1.0.0

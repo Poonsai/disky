@@ -98,7 +98,7 @@ The `comObj{p unsafe.Pointer}` wrapper exists specifically to keep `go vet` quie
 - `tree.RemoveAndRecompute(n)` is called per deleted node — it updates ancestor sizes incrementally, so a batch delete loop with one `RemoveAndRecompute` per item + a single `tree.Sort(m.Current)` + `tree.SortAncestors(m.Current)` at the end is correct (and what `BrowserModel.ApplyBatchDelete` does).
 - `tree.SortAncestors(start)` walks `Parent` chain re-sorting because a node's size change can move it in its parent's `Children` slice.
 
-`BrowserModel.ApplyDelete` (singular) is now production-dead — only the tests still call it. It's intentionally left in place; cleanup will happen separately. Use `ApplyBatchDelete([]*tree.Node{n})` for new code paths.
+`BrowserModel.ApplyBatchDelete` is the single mutation path used after a recycle batch. Call it with a one-element slice for single-item deletes; there's no separate `ApplyDelete` helper.
 
 ### `tui` selection model
 

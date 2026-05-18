@@ -331,21 +331,6 @@ func truncateRunes(s string, budget int) string {
 	return string(r[:budget-1]) + "…"
 }
 
-// ApplyDelete removes target from the tree and clears PendingDeletes.
-// Caller should already have moved the actual filesystem path via recycle.Send.
-func (m BrowserModel) ApplyDelete(target *tree.Node) BrowserModel {
-	tree.RemoveAndRecompute(target)
-	tree.Sort(m.Current)
-	// m.Current's Size shrank, so its position among its siblings — and
-	// every ancestor's position — may be stale. Walk up sorting.
-	tree.SortAncestors(m.Current)
-	if m.Cursor >= len(m.Current.Children) && m.Cursor > 0 {
-		m.Cursor = len(m.Current.Children) - 1
-	}
-	m.PendingDeletes = nil
-	return m.adjustOffset()
-}
-
 // ApplyBatchDelete removes each successfully-recycled node from the tree,
 // drops it from the Selected set, and clears PendingDeletes. Nodes that
 // failed (i.e. are NOT in succeeded) stay in the tree and stay selected

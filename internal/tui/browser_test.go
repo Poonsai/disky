@@ -124,18 +124,18 @@ func TestBrowserDeleteOnEmptyFolderIsNoop(t *testing.T) {
 	}
 }
 
-func TestBrowserApplyDelete(t *testing.T) {
+func TestBrowserApplyBatchDeleteSingleItem(t *testing.T) {
+	// Single-item batch delete: same tree mutations + cursor clamp as
+	// the (removed) ApplyDelete used to provide.
 	m := NewBrowser(sampleTree())
 	target := m.Current.Children[0] // "sub"
-	m = m.ApplyDelete(target)
-	// "sub" should be gone from root.Children, leaving only "a.txt".
+	m = m.ApplyBatchDelete([]*tree.Node{target})
 	if len(m.Current.Children) != 1 || m.Current.Children[0].Name != "a.txt" {
 		t.Errorf("Current.Children after delete: %+v", m.Current.Children)
 	}
 	if m.Root.Size != 30 {
 		t.Errorf("Root.Size: got %d, want 30", m.Root.Size)
 	}
-	// Cursor must remain within bounds.
 	if m.Cursor >= len(m.Current.Children) {
 		t.Errorf("Cursor out of bounds: %d (len=%d)", m.Cursor, len(m.Current.Children))
 	}
@@ -197,7 +197,7 @@ func TestBrowserCancelRescan(t *testing.T) {
 	}
 }
 
-func TestBrowserApplyDeleteResortsAncestors(t *testing.T) {
+func TestBrowserApplyBatchDeleteResortsAncestors(t *testing.T) {
 	// Build a 3-level tree where deleting inside "big-sub" makes it
 	// smaller than its sibling "small-sub", so root.Children should
 	// resort.
@@ -214,7 +214,7 @@ func TestBrowserApplyDeleteResortsAncestors(t *testing.T) {
 	// Browse into big-sub and delete its only child.
 	m := NewBrowser(root)
 	m.Current = bigSub
-	m = m.ApplyDelete(target)
+	m = m.ApplyBatchDelete([]*tree.Node{target})
 
 	// root.Children must now have small-sub first (50 > 0 after the delete).
 	if root.Children[0].Name != "small-sub" {
@@ -549,7 +549,6 @@ func TestBrowserShiftAClearsSelection(t *testing.T) {
 	}
 }
 
-// stripANSI removes ANSI CSI escape sequences for plain-text length checks.
 func TestBrowserEnterFolderClearsSelection(t *testing.T) {
 	m := NewBrowser(sampleTree())
 	// Select the row that will become the new Current (sub) — the selection

@@ -43,7 +43,7 @@ The TUI opens with an interactive drive picker, then a progress screen while the
 | `Space`                   | Toggle bulk-select on cursor row           |
 | `Shift+↑` / `Shift+↓`     | Range-select (or `K` / `J`)                |
 | `a` / `A`                 | Select all / clear selection               |
-| `d`                       | Delete selection (Recycle Bin, confirmable) |
+| `d`                       | Delete selection, or cursor row if none (Recycle Bin, confirmable) |
 | `r`                       | Rescan current folder                      |
 | `g` / `G`                 | Jump to top / bottom                       |
 | `q` / `Esc`               | Quit                                       |

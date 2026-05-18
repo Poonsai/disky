@@ -18,7 +18,7 @@ go run ./cmd/disky
 
 # release-style binary (~3.4 MB stripped vs ~5 MB) — also injects the
 # version string surfaced by `disky --version`
-go build -ldflags "-s -w -X main.version=v1.1.2" -o disky.exe ./cmd/disky
+go build -ldflags "-s -w -X main.version=v1.1.3" -o disky.exe ./cmd/disky
 ```
 
 Without `-X main.version=...` the binary prints `dev` for `--version`,

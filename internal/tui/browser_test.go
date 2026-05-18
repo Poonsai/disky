@@ -817,12 +817,39 @@ func TestBrowserHelpLineMentionsSelection(t *testing.T) {
 	m.Width = 200 // wide enough to render the full help line
 	m.Height = 24
 	out := m.View()
-	for _, want := range []string{"nav", "Space sel", "all/clear", "d delete"} {
+	for _, want := range []string{"nav", "Space sel", "a/A all", "d delete"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("help line missing %q; got:\n%s", want, out)
 		}
 	}
 	if strings.Contains(out, "↑/↓ select") {
 		t.Errorf("help line still says '↑/↓ select'; should say 'nav'")
+	}
+}
+
+func TestBrowserHelpLineKeepsQuitVisibleOn80Cols(t *testing.T) {
+	// Regression for v1.1.2 -> v1.1.3: the previous v1.1.1/v1.1.2 help
+	// line was 88 runes; on the default 80-col Windows Terminal it
+	// truncated and hid `q quit`. New users had no in-app hint for the
+	// quit hotkey. The line must now fit in 80 cols with the q-quit
+	// hint preserved.
+	m := NewBrowser(sampleTree())
+	m.Width = 80
+	m.Height = 24
+	out := m.View()
+	lines := strings.Split(out, "\n")
+	var helpLine string
+	for i := len(lines) - 1; i >= 0; i-- {
+		stripped := stripANSI(lines[i])
+		if strings.TrimSpace(stripped) != "" {
+			helpLine = stripped
+			break
+		}
+	}
+	if !strings.Contains(helpLine, "q quit") {
+		t.Errorf("80-col terminal must keep 'q quit' visible in help line; got:\n%q", helpLine)
+	}
+	if utf8.RuneCountInString(helpLine) > 80 {
+		t.Errorf("help line exceeds 80 cols: %d runes\n%q", utf8.RuneCountInString(helpLine), helpLine)
 	}
 }

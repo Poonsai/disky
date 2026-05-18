@@ -21,7 +21,7 @@ go build -o disky.exe ./cmd/disky
 For a release-style build that embeds the version string:
 
 ```powershell
-go build -ldflags "-s -w -X main.version=v1.1.2" -o disky.exe ./cmd/disky
+go build -ldflags "-s -w -X main.version=v1.1.3" -o disky.exe ./cmd/disky
 ```
 
 ## Usage

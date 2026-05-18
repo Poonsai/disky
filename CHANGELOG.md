@@ -9,6 +9,18 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 _Nothing yet._
 
+## [1.1.3] — 2026-05-17
+
+### Fixed
+
+- **Help line was still truncating on 80-col terminals.** The v1.1.1
+  trim took the help line from 128 → 88 runes but the default Windows
+  Terminal width is 80, so `q quit` was still being clipped. Tightened
+  to 71 runes by dropping the `/Enter` and `/Backspace` mentions
+  (arrows are obvious; the README key table documents the full set)
+  and shortening `all/clear` to `all`. A new regression test asserts
+  `q quit` is visible at width 80.
+
 ## [1.1.2] — 2026-05-17
 
 ### Fixed
@@ -71,7 +83,8 @@ _Nothing yet._
 - Honest error reporting from the Recycle Bin call — non-recyclable items
   return an HRESULT instead of silently permanent-deleting.
 
-[Unreleased]: https://github.com/Poonsai/disky/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/Poonsai/disky/compare/v1.1.3...HEAD
+[1.1.3]: https://github.com/Poonsai/disky/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/Poonsai/disky/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/Poonsai/disky/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/Poonsai/disky/compare/v1.0.0...v1.1.0

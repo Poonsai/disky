@@ -298,7 +298,7 @@ func (m BrowserModel) View() string {
 	if m.Toast != "" {
 		bottom = StyleError.Render(truncateRunes(m.Toast, width))
 	} else {
-		help := "↑/↓ nav  →/Enter open  ←/Back back  Space sel  a/A all/clear  d delete  r rescan  q quit"
+		help := "↑/↓ nav  → open  ← back  Space sel  a/A all  d delete  r rescan  q quit"
 		if n > m.viewportRows() {
 			end := m.Offset + m.viewportRows()
 			if end > n {

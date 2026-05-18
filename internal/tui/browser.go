@@ -358,7 +358,12 @@ func (m BrowserModel) ApplyBatchDelete(succeeded []*tree.Node) BrowserModel {
 	}
 	tree.Sort(m.Current)
 	tree.SortAncestors(m.Current)
-	if m.Cursor >= len(m.Current.Children) && m.Cursor > 0 {
+	// Clamp the cursor into the new (possibly empty) child list. The
+	// empty-folder case must reset to 0, not len-1 = -1, or the next
+	// keypress in the empty folder panics on Children[-1].
+	if len(m.Current.Children) == 0 {
+		m.Cursor = 0
+	} else if m.Cursor >= len(m.Current.Children) {
 		m.Cursor = len(m.Current.Children) - 1
 	}
 	m.PendingDeletes = nil

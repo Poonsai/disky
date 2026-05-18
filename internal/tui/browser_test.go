@@ -738,6 +738,44 @@ func TestBrowserApplyBatchDeleteRemovesSucceededOnly(t *testing.T) {
 	}
 }
 
+func TestBrowserApplyBatchDeleteAllChildrenLeavesValidCursor(t *testing.T) {
+	// Regression: if every child is deleted in one batch while the cursor
+	// is at a non-zero position, the old clamp `if Cursor >= len && Cursor > 0`
+	// computed `len - 1 = -1`, which then panicked on the next key press
+	// inside the now-empty folder.
+	root := &tree.Node{Name: `C:\`, IsDir: true, Size: 60}
+	a := &tree.Node{Name: "a", Size: 10, Parent: root}
+	b := &tree.Node{Name: "b", Size: 20, Parent: root}
+	c := &tree.Node{Name: "c", Size: 30, Parent: root}
+	root.Children = []*tree.Node{c, b, a}
+
+	m := NewBrowser(root)
+	m.Cursor = 2 // not at row 0 — this is what triggers the old bug
+	m.Selected = map[*tree.Node]struct{}{a: {}, b: {}, c: {}}
+
+	m = m.ApplyBatchDelete([]*tree.Node{a, b, c})
+
+	if len(m.Current.Children) != 0 {
+		t.Fatalf("Current.Children should be empty after deleting all; got %d", len(m.Current.Children))
+	}
+	if m.Cursor < 0 {
+		t.Fatalf("Cursor went negative after batch delete: got %d", m.Cursor)
+	}
+
+	// Now exercise the panic surface: 'd' falls back to cursor-indexed
+	// when Selected is empty, guarded by `Cursor < len(Children)`. With a
+	// -1 cursor and an empty folder that guard is true and Children[-1]
+	// panics. The fix must keep this safe.
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Update with empty folder + post-batch cursor panicked: %v", r)
+		}
+	}()
+	_, _ = m.Update(tea.KeyMsg{Runes: []rune("d"), Type: tea.KeyRunes})
+	_, _ = m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	_, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+}
+
 func TestBrowserApplyRescanClearsSelection(t *testing.T) {
 	m := NewBrowser(sampleTree())
 	a, _ := m.Update(tea.KeyMsg{Runes: []rune("a"), Type: tea.KeyRunes})

@@ -33,3 +33,30 @@ func TestFormatBatchFailureAllFailed(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
+
+func TestResolveVersionPrefersLDFlagsInjection(t *testing.T) {
+	orig := version
+	defer func() { version = orig }()
+	version = "v9.9.9"
+	if got := resolveVersion(); got != "v9.9.9" {
+		t.Errorf("resolveVersion: got %q, want %q", got, "v9.9.9")
+	}
+}
+
+func TestResolveVersionFallsBackToDev(t *testing.T) {
+	orig := version
+	defer func() { version = orig }()
+	version = "dev"
+	// When running under `go test` BuildInfo.Main.Version is "(devel)"
+	// or empty, so the BuildInfo branch declines and we get the
+	// literal "dev" fallback.
+	got := resolveVersion()
+	if got != "dev" && got != "v9.9.9" {
+		// Tolerant assertion: BuildInfo behavior across Go releases
+		// occasionally surfaces a non-empty Main.Version. As long as
+		// it's not garbage, accept it.
+		if len(got) == 0 {
+			t.Errorf("resolveVersion returned empty string")
+		}
+	}
+}

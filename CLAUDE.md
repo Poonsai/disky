@@ -16,9 +16,15 @@ go build ./...
 go test ./... -count=1
 go run ./cmd/disky
 
-# release-style binary (~3.4 MB stripped vs ~5 MB)
-go build -ldflags "-s -w" -o disky.exe ./cmd/disky
+# release-style binary (~3.4 MB stripped vs ~5 MB) — also injects the
+# version string surfaced by `disky --version`
+go build -ldflags "-s -w -X main.version=v1.1.0" -o disky.exe ./cmd/disky
 ```
+
+Without `-X main.version=...` the binary prints `dev` for `--version`,
+unless it was installed via `go install …@vX.Y.Z` — in that case
+`runtime/debug.ReadBuildInfo` provides the module version automatically.
+Tagging a new release is what makes `@latest` users see the new version.
 
 ### Recycle-bin integration tests
 

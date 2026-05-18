@@ -2,8 +2,10 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -14,11 +16,43 @@ import (
 	"github.com/Poonsai/disky/internal/tui"
 )
 
+// version is the build-time version string. Release binaries inject the
+// git tag via `-ldflags "-X main.version=vX.Y.Z"`. When unset (local
+// `go build` / `go run`), resolveVersion falls back to BuildInfo.
+var version = "dev"
+
 func main() {
+	showVersion := flag.Bool("version", false, "print version and exit")
+	flag.BoolVar(showVersion, "v", false, "print version and exit (shorthand)")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(resolveVersion())
+		return
+	}
+
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "disky:", err)
 		os.Exit(1)
 	}
+}
+
+// resolveVersion returns the most informative version string available.
+// Preference order:
+//  1. The ldflags-injected `version` variable (release binaries).
+//  2. The module version from debug.ReadBuildInfo (`go install ...@vX.Y.Z`).
+//  3. The literal "dev" fallback for plain `go build` / `go run`.
+func resolveVersion() string {
+	if version != "dev" {
+		return version
+	}
+	if info, ok := debug.ReadBuildInfo(); ok {
+		v := info.Main.Version
+		if v != "" && v != "(devel)" {
+			return v
+		}
+	}
+	return version
 }
 
 func run() error {

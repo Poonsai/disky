@@ -18,13 +18,20 @@ cd disky
 go build -o disky.exe ./cmd/disky
 ```
 
+For a release-style build that embeds the version string:
+
+```powershell
+go build -ldflags "-s -w -X main.version=v1.1.0" -o disky.exe ./cmd/disky
+```
+
 ## Usage
 
 ```powershell
-disky
+disky              # launch the TUI
+disky --version    # print version and exit (also -v)
 ```
 
-You'll get an interactive drive picker, then a progress screen while the drive is scanned, then a sortable folder browser.
+The TUI opens with an interactive drive picker, then a progress screen while the drive is scanned, then a sortable folder browser.
 
 ### Keys (browser)
 
@@ -44,6 +51,10 @@ You'll get an interactive drive picker, then a progress screen while the drive i
 ## Design
 
 See [docs/superpowers/specs/2026-05-16-disky-design.md](docs/superpowers/specs/2026-05-16-disky-design.md) for the full architecture.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

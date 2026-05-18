@@ -118,3 +118,40 @@ func TestConfirmMultiItemTruncatesPaths(t *testing.T) {
 		t.Errorf("overflow line missing; got:\n%s", out)
 	}
 }
+
+func TestConfirmExactlyAtBulletCap(t *testing.T) {
+	// Boundary: maxBullets = 5. Five items must show all bullets and NO
+	// "... and N more" overflow line.
+	var items []ConfirmItem
+	for i := 0; i < 5; i++ {
+		items = append(items, ConfirmItem{Path: "C:\\item-" + string(rune('a'+i)), Size: 1})
+	}
+	out := NewConfirm(items).View()
+	for i := 0; i < 5; i++ {
+		want := "• C:\\item-" + string(rune('a'+i))
+		if !strings.Contains(out, want) {
+			t.Errorf("bullet %d missing %q; got:\n%s", i, want, out)
+		}
+	}
+	if strings.Contains(out, "more") {
+		t.Errorf("at exact bullet cap, no overflow line expected; got:\n%s", out)
+	}
+}
+
+func TestConfirmJustOverBulletCap(t *testing.T) {
+	// Boundary: 6 items shows the first 5 bullets plus "... and 1 more".
+	var items []ConfirmItem
+	for i := 0; i < 6; i++ {
+		items = append(items, ConfirmItem{Path: "C:\\item-" + string(rune('a'+i)), Size: 1})
+	}
+	out := NewConfirm(items).View()
+	if !strings.Contains(out, "• C:\\item-e") {
+		t.Errorf("fifth bullet missing; got:\n%s", out)
+	}
+	if strings.Contains(out, "• C:\\item-f") {
+		t.Errorf("sixth bullet must be hidden by overflow; got:\n%s", out)
+	}
+	if !strings.Contains(out, "... and 1 more") {
+		t.Errorf("expected '... and 1 more' overflow line; got:\n%s", out)
+	}
+}

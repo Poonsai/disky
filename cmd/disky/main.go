@@ -161,20 +161,28 @@ func handleDelete(bm tui.BrowserModel) tui.BrowserModel {
 		return bm.CancelDelete()
 	}
 
-	var succeeded []*tree.Node
-	var failed []string
-	for _, t := range targets {
-		if err := recycle.Send(t.Path()); err != nil {
-			failed = append(failed, t.Name)
-			continue
-		}
-		succeeded = append(succeeded, t)
-	}
+	succeeded, failed := runBatchRecycle(targets, recycle.Send)
 	bm = bm.ApplyBatchDelete(succeeded)
 	if len(failed) > 0 {
 		bm.Toast = formatBatchFailure(len(succeeded), len(targets), failed)
 	}
 	return bm
+}
+
+// runBatchRecycle attempts to recycle each target in order, calling send
+// per item. Returns the successfully-recycled nodes and the names of the
+// failures (in input order). Extracted from handleDelete so the dispatch
+// glue is unit-testable without spinning up a tea.Program or touching
+// the real Recycle Bin.
+func runBatchRecycle(targets []*tree.Node, send func(string) error) (succeeded []*tree.Node, failed []string) {
+	for _, t := range targets {
+		if err := send(t.Path()); err != nil {
+			failed = append(failed, t.Name)
+			continue
+		}
+		succeeded = append(succeeded, t)
+	}
+	return succeeded, failed
 }
 
 // formatBatchFailure produces a one-line summary toast for a batch

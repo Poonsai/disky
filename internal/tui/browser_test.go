@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -773,6 +774,52 @@ func TestBrowserApplyBatchDeleteAllChildrenLeavesValidCursor(t *testing.T) {
 	_, _ = m.Update(tea.KeyMsg{Runes: []rune("d"), Type: tea.KeyRunes})
 	_, _ = m.Update(tea.KeyMsg{Type: tea.KeySpace})
 	_, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+}
+
+func TestBrowserRowMarkersStackForCursorSelectedError(t *testing.T) {
+	// Three-way overlap: a row that is (a) under the cursor, (b) in
+	// Selected, AND (c) has c.Err set. The renderer wraps the whole
+	// row in StyleSelected (reverse video) using plain inner strings
+	// so the cursor styling survives across the bar boundary; the
+	// "* " sel marker and "[!] " error marker must both be present
+	// inside that wrap and the View output must stay valid UTF-8
+	// and within the width budget.
+	root := &tree.Node{Name: `C:\`, IsDir: true}
+	bad := &tree.Node{Name: "bad", Size: 100, Parent: root, Err: errors.New("perm denied")}
+	root.Children = []*tree.Node{bad}
+
+	m := NewBrowser(root)
+	m.Width = 80
+	m.Height = 24
+	m.Selected = map[*tree.Node]struct{}{bad: {}}
+	// Cursor defaults to 0 = "bad".
+
+	out := m.View()
+	if !utf8.ValidString(out) {
+		t.Error("View output is not valid UTF-8 with cursor+selected+error overlap")
+	}
+	// Find the row line containing "bad". It must show the [!] marker
+	// (error) AND a * (selection) in the row payload.
+	var rowLine string
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "bad") {
+			rowLine = stripANSI(line)
+			break
+		}
+	}
+	if rowLine == "" {
+		t.Fatal("did not find the 'bad' row in View output")
+	}
+	if !strings.Contains(rowLine, "[!]") {
+		t.Errorf("cursor+selected+error row missing [!] marker; got %q", rowLine)
+	}
+	if !strings.Contains(rowLine, "*") {
+		t.Errorf("cursor+selected+error row missing * marker; got %q", rowLine)
+	}
+	// Row must fit width.
+	if utf8.RuneCountInString(rowLine) > 80 {
+		t.Errorf("row exceeds width 80: %d runes\n%q", utf8.RuneCountInString(rowLine), rowLine)
+	}
 }
 
 func TestBrowserApplyRescanClearsSelection(t *testing.T) {
